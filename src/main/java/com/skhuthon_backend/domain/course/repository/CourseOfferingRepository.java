@@ -1,5 +1,6 @@
 package com.skhuthon_backend.domain.course.repository;
 
+import com.skhuthon_backend.domain.course.Course;
 import com.skhuthon_backend.domain.course.CourseCategory;
 import com.skhuthon_backend.domain.course.CourseOffering;
 import java.util.Collection;
@@ -16,7 +17,7 @@ public interface CourseOfferingRepository extends JpaRepository<CourseOffering, 
     // Finds offerings by category.
     List<CourseOffering> findByCategory(CourseCategory category);
 
-    // Finds a unique offering by course code and section number.
-    Optional<CourseOffering> findByCourse_CourseCodeAndSectionNo(String courseCode, String sectionNo);
+    // Finds an offering by course and section number.
+    Optional<CourseOffering> findByCourseAndSectionNo(Course course, String sectionNo);
 
 }
