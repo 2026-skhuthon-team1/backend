@@ -6,6 +6,8 @@ import com.skhuthon_backend.domain.course.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
+import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
+import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
 import java.util.ArrayList;
@@ -29,6 +31,11 @@ public class TimetableEngineService {
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
+
+    @Transactional(readOnly = true)
+    public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
+        return Collections.emptyList();
+    }
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findCandidateOfferings(CourseCandidateRequestDto request) {
