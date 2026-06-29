@@ -26,6 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TimetableEngineService {
 
+    private final CourseCandidateProvider courseCandidateProvider;
+    private final TimetableConstraintFilter timetableConstraintFilter;
+    private final TimetableCombinationGenerator timetableCombinationGenerator;
+    private final TimetableCombinationMapper timetableCombinationMapper;
     private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
     private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
     private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
@@ -35,7 +39,23 @@ public class TimetableEngineService {
 
     @Transactional(readOnly = true)
     public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
-        return Collections.emptyList();
+        CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
+        List<CourseOffering> filteredOfferings = timetableConstraintFilter.apply(
+                candidateContext.offerings(),
+                candidateContext.timesByOfferingId(),
+                request
+        );
+        List<TimetableCombination> combinations = timetableCombinationGenerator.generate(
+                filteredOfferings,
+                candidateContext.timesByOfferingId(),
+                request
+        );
+
+        return timetableCombinationMapper.toTimetableResponses(
+                combinations,
+                candidateContext.timesByOfferingId(),
+                request
+        );
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +102,7 @@ public class TimetableEngineService {
 
         return courseOfferingRepository.findByCategoryAndSectionGroupIn(MAJOR_CATEGORY, studentMajors);
     }
+        CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
 
     private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
         return courseOfferingRepository.findByCategory(GENERAL_CATEGORY).stream()
@@ -155,5 +176,6 @@ public class TimetableEngineService {
 
         return first.getStartTime().isBefore(second.getEndTime())
                 && second.getStartTime().isBefore(first.getEndTime());
+        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
     }
 }
