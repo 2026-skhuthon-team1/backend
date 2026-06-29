@@ -1,18 +1,17 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # localhost:3306 뒤의 skhuthon은 1단계에서 만든 데이터베이스 이름입니다.
+    # localhost:3306 뒤의 skhuthon은 1단계에서 만든 데이터베이스 이름
     url: jdbc:mysql://localhost:3306/skhuthon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root        # 본인의 MySQL 계정 (일반적으로 root)
-    password: wert030415 # 본인의 MySQL 비밀번호 입력
-
+#    username: ${DB_USERNAME}
+#    password: ${DB_PASSWORD}
+    username: root
+    password: wert030415
   jpa:
-    # 아주 중요! 이미 DB에 테이블과 데이터를 밀어넣었으므로,
-    # Spring이 멋대로 테이블을 삭제하거나 덮어쓰지 않게 none 또는 validate로 설정합니다.
     hibernate:
       ddl-auto: none
 
-    # JPA가 실행하는 쿼리를 콘솔에서 보기 좋게 출력해줍니다.
+    # JPA가 실행하는 쿼리를 콘솔에서 보기 좋게 출력
     show-sql: true
     properties:
       hibernate:

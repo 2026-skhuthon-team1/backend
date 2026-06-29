@@ -1,6 +1,7 @@
 package com.skhuthon_backend.domain.course;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -30,7 +31,8 @@ public class CourseOffering {
     private Course course;
 
     @Column(name = "category", nullable = false, length = 4)
-    private String category;
+    @Convert(converter = CourseCategoryConverter.class)
+    private CourseCategory category;
 
     @Column(name = "section_group", nullable = false, length = 60)
     private String sectionGroup;
@@ -59,7 +61,7 @@ public class CourseOffering {
     @Builder
     public CourseOffering(
             Course course,
-            String category,
+            CourseCategory category,
             String sectionGroup,
             String courseType,
             String offeredYear,

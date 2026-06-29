@@ -1,9 +1,11 @@
 package com.skhuthon_backend.domain.course.service;
 
+import com.skhuthon_backend.domain.course.CourseCategory;
 import com.skhuthon_backend.domain.course.CourseOffering;
 import com.skhuthon_backend.domain.course.OfferingTime;
-import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponse;
-import com.skhuthon_backend.domain.course.dto.OfferingTimeResponse;
+import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
+import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
+import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
 import java.util.ArrayList;
@@ -22,26 +24,19 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TimetableEngineService {
 
-    private static final String MAJOR_CATEGORY = "\uC804\uACF5";
-    private static final String GENERAL_CATEGORY = "\uAD50\uC591";
+    private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
+    private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
 
     @Transactional(readOnly = true)
-    public List<CourseOfferingCandidateResponse> findCandidateOfferings(
-            List<String> studentMajors,
-            Integer studentYear,
-            List<String> completedCourseCodes
-    ) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors);
-        List<CourseOffering> generalOfferings = courseOfferingRepository.findAvailableGeneralOfferings(
-                GENERAL_CATEGORY,
-                String.valueOf(studentYear)
-        );
+    public List<CourseOfferingCandidateResponseDto> findCandidateOfferings(CourseCandidateRequestDto request) {
+        List<CourseOffering> majorOfferings = findMajorOfferings(request.getStudentMajors());
+        List<CourseOffering> generalOfferings = findGeneralOfferings(request.getStudentYear());
 
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
-        Set<String> completedCodeSet = toSet(completedCourseCodes);
+        Set<String> completedCodeSet = toSet(request.getCompletedCourseCodes());
 
         List<CourseOffering> filteredOfferings = candidateOfferings.stream()
                 .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
@@ -50,7 +45,7 @@ public class TimetableEngineService {
         Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(filteredOfferings);
 
         return filteredOfferings.stream()
-                .map(courseOffering -> CourseOfferingCandidateResponse.of(
+                .map(courseOffering -> CourseOfferingCandidateResponseDto.of(
                         courseOffering,
                         toTimeResponses(timesByOfferingId.getOrDefault(courseOffering.getId(), Collections.emptyList()))
                 ))
@@ -63,6 +58,24 @@ public class TimetableEngineService {
         }
 
         return courseOfferingRepository.findByCategoryAndSectionGroupIn(MAJOR_CATEGORY, studentMajors);
+    }
+
+    private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
+        return courseOfferingRepository.findByCategory(GENERAL_CATEGORY).stream()
+                .filter(courseOffering -> isAvailableForStudentYear(courseOffering, studentYear))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isAvailableForStudentYear(CourseOffering courseOffering, Integer studentYear) {
+        if (courseOffering.getYearRestricted() == null || !courseOffering.getYearRestricted()) {
+            return true;
+        }
+
+        if (courseOffering.getOfferedYear() == null) {
+            return true;
+        }
+
+        return courseOffering.getOfferedYear().contains(String.valueOf(studentYear));
     }
 
     private List<CourseOffering> mergeWithoutDuplicate(
@@ -94,9 +107,9 @@ public class TimetableEngineService {
                 .collect(Collectors.groupingBy(offeringTime -> offeringTime.getCourseOffering().getId()));
     }
 
-    private List<OfferingTimeResponse> toTimeResponses(List<OfferingTime> offeringTimes) {
+    private List<OfferingTimeResponseDto> toTimeResponses(List<OfferingTime> offeringTimes) {
         return offeringTimes.stream()
-                .map(OfferingTimeResponse::from)
+                .map(OfferingTimeResponseDto::from)
                 .collect(Collectors.toList());
     }
 

@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CourseCandidateRequest {
+public class CourseCandidateRequestDto {
 
     @Schema(description = "학생의 본전공 및 복수전공 목록", example = "[\"소프트웨어융합전공\", \"인공지능전공\"]")
     @NotEmpty(message = "전공 목록은 필수입니다.")
@@ -37,7 +37,7 @@ public class CourseCandidateRequest {
             String> completedCourseCodes;
 
     @Builder
-    public CourseCandidateRequest(
+    public CourseCandidateRequestDto(
             List<String> studentMajors,
             Integer studentYear,
             List<String> completedCourseCodes
