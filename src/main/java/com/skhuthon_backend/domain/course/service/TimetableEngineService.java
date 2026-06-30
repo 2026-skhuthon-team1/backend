@@ -28,6 +28,7 @@ public class TimetableEngineService {
 
     private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
     private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
+    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
@@ -35,6 +36,26 @@ public class TimetableEngineService {
     @Transactional(readOnly = true)
     public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
         return Collections.emptyList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
+        List<CourseOffering> courseOfferings = courseOfferingRepository.findAll();
+        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(courseOfferings);
+
+        return toCourseOfferingResponses(courseOfferings, timesByOfferingId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseOfferingCandidateResponseDto> findSelectableOfferings(List<String> studentMajors) {
+        List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
+                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCourseType()))
+                .collect(Collectors.toList());
+        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(GENERAL_CATEGORY);
+        List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
+        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(selectableOfferings);
+
+        return toCourseOfferingResponses(selectableOfferings, timesByOfferingId);
     }
 
     @Transactional(readOnly = true)
@@ -51,12 +72,7 @@ public class TimetableEngineService {
 
         Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(filteredOfferings);
 
-        return filteredOfferings.stream()
-                .map(courseOffering -> CourseOfferingCandidateResponseDto.of(
-                        courseOffering,
-                        toTimeResponses(timesByOfferingId.getOrDefault(courseOffering.getId(), Collections.emptyList()))
-                ))
-                .collect(Collectors.toList());
+        return toCourseOfferingResponses(filteredOfferings, timesByOfferingId);
     }
 
     private List<CourseOffering> findMajorOfferings(List<String> studentMajors) {
@@ -117,6 +133,18 @@ public class TimetableEngineService {
     private List<OfferingTimeResponseDto> toTimeResponses(List<OfferingTime> offeringTimes) {
         return offeringTimes.stream()
                 .map(OfferingTimeResponseDto::from)
+                .collect(Collectors.toList());
+    }
+
+    private List<CourseOfferingCandidateResponseDto> toCourseOfferingResponses(
+            List<CourseOffering> courseOfferings,
+            Map<Long, List<OfferingTime>> timesByOfferingId
+    ) {
+        return courseOfferings.stream()
+                .map(courseOffering -> CourseOfferingCandidateResponseDto.of(
+                        courseOffering,
+                        toTimeResponses(timesByOfferingId.getOrDefault(courseOffering.getId(), Collections.emptyList()))
+                ))
                 .collect(Collectors.toList());
     }
 
