@@ -25,13 +25,13 @@ public class TimetableConstraintFilter {
             Map<Long, List<OfferingTime>> timesByOfferingId,
             TimetableCombinationRequestDto request
     ) {
-        Set<String> requestedFreeDays = toSet(request.getFreeDays());
+        Set<String> requestedFreeDays = toSet(request.freeDays());
 
         return candidates.stream()
                 .filter(courseOffering -> isAllowedByFirstPeriodOption(
                         courseOffering,
                         timesByOfferingId,
-                        request.getExcludeFirstPeriod()
+                        request.excludeFirstPeriod()
                 ))
                 .filter(courseOffering -> isAllowedByFreeDays(courseOffering, timesByOfferingId, requestedFreeDays))
                 .collect(Collectors.toList());

@@ -57,8 +57,8 @@ public class TimetableCombinationMapper {
                 .majorCredits(majorCredits)
                 .generalCredits(generalCredits)
                 .attendanceDays(calculateAttendanceDays(combination.times()))
-                .freeDays(request.getFreeDays() == null ? Collections.emptyList() : request.getFreeDays())
-                .excludeFirstPeriod(request.getExcludeFirstPeriod())
+                .freeDays(request.freeDays() == null ? Collections.emptyList() : request.freeDays())
+                .excludeFirstPeriod(request.excludeFirstPeriod())
                 .offerings(toCourseOfferingResponses(combination.offerings(), timesByOfferingId))
                 .build();
     }

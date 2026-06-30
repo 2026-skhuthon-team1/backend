@@ -73,8 +73,8 @@ public class TimetableCombinationGenerator {
             return;
         }
 
-        if (majorCredits == request.getTargetMajorCredits()
-                && generalCredits == request.getTargetGeneralCredits()) {
+        if (majorCredits == request.targetMajorCredits()
+                && generalCredits == request.targetGeneralCredits()) {
             results.add(new TimetableCombination(
                     List.copyOf(selectedOfferings),
                     List.copyOf(selectedTimes)
@@ -83,10 +83,10 @@ public class TimetableCombinationGenerator {
         }
 
         if (index >= candidates.size()
-                || majorCredits > request.getTargetMajorCredits()
-                || generalCredits > request.getTargetGeneralCredits()
-                || majorCredits + remainingMajorCredits[index] < request.getTargetMajorCredits()
-                || generalCredits + remainingGeneralCredits[index] < request.getTargetGeneralCredits()) {
+                || majorCredits > request.targetMajorCredits()
+                || generalCredits > request.targetGeneralCredits()
+                || majorCredits + remainingMajorCredits[index] < request.targetMajorCredits()
+                || generalCredits + remainingGeneralCredits[index] < request.targetGeneralCredits()) {
             return;
         }
 
@@ -122,8 +122,8 @@ public class TimetableCombinationGenerator {
             nextGeneralCredits += credits;
         }
 
-        if (nextMajorCredits > request.getTargetMajorCredits()
-                || nextGeneralCredits > request.getTargetGeneralCredits()) {
+        if (nextMajorCredits > request.targetMajorCredits()
+                || nextGeneralCredits > request.targetGeneralCredits()) {
             return;
         }
 

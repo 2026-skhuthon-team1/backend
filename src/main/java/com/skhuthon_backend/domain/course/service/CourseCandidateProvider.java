@@ -29,6 +29,7 @@ public class CourseCandidateProvider {
 
     private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
     private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
+    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
@@ -43,10 +44,26 @@ public class CourseCandidateProvider {
 
     public CandidateContext findCandidates(TimetableCombinationRequestDto request) {
         return findCandidates(
-                request.getStudentMajors(),
-                request.getStudentYear(),
-                request.getCompletedCourseCodes()
+                request.studentMajors(),
+                request.studentYear(),
+                request.completedCourseCodes()
         );
+    }
+
+    public CandidateContext findAllOfferings() {
+        List<CourseOffering> courseOfferings = courseOfferingRepository.findAll();
+
+        return new CandidateContext(courseOfferings, findTimesByOfferingId(courseOfferings));
+    }
+
+    public CandidateContext findSelectableOfferings(List<String> studentMajors) {
+        List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
+                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCourseType()))
+                .collect(Collectors.toList());
+        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(GENERAL_CATEGORY);
+        List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
+
+        return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
     }
 
     private CandidateContext findCandidates(

@@ -38,6 +38,20 @@ public class TimetableEngineService {
     private final OfferingTimeRepository offeringTimeRepository;
 
     @Transactional(readOnly = true)
+    public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
+        CandidateContext candidateContext = courseCandidateProvider.findAllOfferings();
+
+        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseOfferingCandidateResponseDto> findSelectableOfferings(List<String> studentMajors) {
+        CandidateContext candidateContext = courseCandidateProvider.findSelectableOfferings(studentMajors);
+
+        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
+    }
+
+    @Transactional(readOnly = true)
     public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
         List<CourseOffering> filteredOfferings = timetableConstraintFilter.apply(
