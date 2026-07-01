@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +30,13 @@ import java.util.stream.Collectors;
 public class CourseCandidateProvider {
 
     private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전공필수", "전공선택", "교양");
+
+    // 소프트웨어융합학부(IT융합자율학부) 4학년 트랙 - 2~3학년은 공통 전공으로 개설되므로
+    // 트랙을 선언한 학생도 학부 공통 전공 과목을 자격 대상에 포함해야 함
+    private static final Set<String> SOFTWARE_CONVERGENCE_TRACKS = Set.of(
+            "소프트웨어공학전공", "정보통신공학전공", "컴퓨터공학전공"
+    );
+    private static final String SOFTWARE_CONVERGENCE_COMMON_MAJOR = "소프트웨어융합전공";
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
@@ -87,7 +95,19 @@ public class CourseCandidateProvider {
             return Collections.emptyList();
         }
 
-        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), studentMajors);
+        List<String> eligibleMajors = resolveEligibleMajors(studentMajors);
+
+        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), eligibleMajors);
+    }
+
+    private List<String> resolveEligibleMajors(List<String> studentMajors) {
+        Set<String> eligibleMajors = new LinkedHashSet<>(studentMajors);
+
+        if (studentMajors.stream().anyMatch(SOFTWARE_CONVERGENCE_TRACKS::contains)) {
+            eligibleMajors.add(SOFTWARE_CONVERGENCE_COMMON_MAJOR);
+        }
+
+        return new ArrayList<>(eligibleMajors);
     }
 
     private List<CourseOffering> findGeneralOfferings(Integer studentYear) {

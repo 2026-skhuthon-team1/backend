@@ -2,26 +2,14 @@ package com.skhuthon_backend.domain.course.service;
 
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
-import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
-import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
-import com.skhuthon_backend.domain.course.entity.OfferingTime;
-import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
-import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -31,9 +19,6 @@ public class TimetableEngineService {
     private final TimetableConstraintFilter timetableConstraintFilter;
     private final TimetableCombinationGenerator timetableCombinationGenerator;
     private final TimetableCombinationMapper timetableCombinationMapper;
-
-    private final CourseOfferingRepository courseOfferingRepository;
-    private final OfferingTimeRepository offeringTimeRepository;
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
@@ -72,91 +57,8 @@ public class TimetableEngineService {
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findCandidateOfferings(CourseCandidateRequestDto request) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(request.studentMajors());
-        List<CourseOffering> generalOfferings = findGeneralOfferings(request.studentYear());
+        CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
 
-        List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
-        Set<String> completedCodeSet = toSet(request.completedCourseCodes());
-
-        List<CourseOffering> filteredOfferings = candidateOfferings.stream()
-                .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
-                .collect(Collectors.toList());
-
-        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(filteredOfferings);
-
-        return toCourseOfferingResponses(filteredOfferings, timesByOfferingId);
-    }
-
-    private List<CourseOffering> findMajorOfferings(List<String> studentMajors) {
-        if (studentMajors == null || studentMajors.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), studentMajors);
-    }
-
-    private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
-        return courseOfferingRepository.findByCategory(CourseCategory.GENERAL).stream()
-                .filter(courseOffering -> isAvailableForStudentYear(courseOffering, studentYear))
-                .collect(Collectors.toList());
-    }
-
-    private boolean isAvailableForStudentYear(CourseOffering courseOffering, Integer studentYear) {
-        if (courseOffering.getYearRestricted() == null || !courseOffering.getYearRestricted()) {
-            return true;
-        }
-
-        if (courseOffering.getOfferedYear() == null) {
-            return true;
-        }
-
-        return courseOffering.getOfferedYear().contains(String.valueOf(studentYear));
-    }
-
-    private List<CourseOffering> mergeWithoutDuplicate(
-            List<CourseOffering> firstOfferings,
-            List<CourseOffering> secondOfferings
-    ) {
-        Map<Long, CourseOffering> offeringsById = new LinkedHashMap<>();
-
-        firstOfferings.forEach(courseOffering -> offeringsById.put(courseOffering.getId(), courseOffering));
-        secondOfferings.forEach(courseOffering -> offeringsById.put(courseOffering.getId(), courseOffering));
-
-        return new ArrayList<>(offeringsById.values());
-    }
-
-    private Set<String> toSet(Collection<String> values) {
-        if (values == null || values.isEmpty()) {
-            return Collections.emptySet();
-        }
-
-        return values.stream().collect(Collectors.toSet());
-    }
-
-    private Map<Long, List<OfferingTime>> findTimesByOfferingId(List<CourseOffering> courseOfferings) {
-        if (courseOfferings.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        return offeringTimeRepository.findByCourseOfferingIn(courseOfferings).stream()
-                .collect(Collectors.groupingBy(offeringTime -> offeringTime.getCourseOffering().getId()));
-    }
-
-    private List<OfferingTimeResponseDto> toTimeResponses(List<OfferingTime> offeringTimes) {
-        return offeringTimes.stream()
-                .map(OfferingTimeResponseDto::from)
-                .collect(Collectors.toList());
-    }
-
-    private List<CourseOfferingCandidateResponseDto> toCourseOfferingResponses(
-            List<CourseOffering> courseOfferings,
-            Map<Long, List<OfferingTime>> timesByOfferingId
-    ) {
-        return courseOfferings.stream()
-                .map(courseOffering -> CourseOfferingCandidateResponseDto.of(
-                        courseOffering,
-                        toTimeResponses(timesByOfferingId.getOrDefault(courseOffering.getId(), Collections.emptyList()))
-                ))
-                .collect(Collectors.toList());
+        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
     }
 }
