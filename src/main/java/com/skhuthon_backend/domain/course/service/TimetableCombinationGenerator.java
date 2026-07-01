@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +34,11 @@ public class TimetableCombinationGenerator {
             TimetableCombinationRequestDto request
     ) {
         List<TimetableCombination> results = new ArrayList<>();
-        int[] remainingMajorCredits = IntStream.concat(Arrays.stream(calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_ELECTIVE)), Arrays.stream(calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_REQUIRED))).toArray();
+        int[] remainingElectiveCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_ELECTIVE);
+        int[] remainingRequiredCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_REQUIRED);
+        int[] remainingMajorCredits = IntStream.range(0, remainingElectiveCredits.length)
+                .map(index -> remainingElectiveCredits[index] + remainingRequiredCredits[index])
+                .toArray();
         int[] remainingGeneralCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.GENERAL);
 
         backtrack(
