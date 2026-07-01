@@ -1,25 +1,33 @@
 package com.skhuthon_backend.domain.course.entity;
 
-import com.skhuthon_backend.domain.course.CourseCategoryConverter;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Getter
 @Entity
+@Builder
 @Table(name = "course_offering")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class CourseOffering {
 
     @Id
@@ -31,15 +39,12 @@ public class CourseOffering {
     @JoinColumn(name = "course_code", nullable = false)
     private Course course;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 4)
-    @Convert(converter = CourseCategoryConverter.class)
     private CourseCategory category;
 
     @Column(name = "section_group", nullable = false, length = 60)
     private String sectionGroup;
-
-    @Column(name = "course_type", length = 4)
-    private String courseType;
 
     @Column(name = "offered_year", length = 12)
     private String offeredYear;
@@ -59,28 +64,7 @@ public class CourseOffering {
     @Column(name = "note", length = 255)
     private String note;
 
-    @Builder
-    public CourseOffering(
-            Course course,
-            CourseCategory category,
-            String sectionGroup,
-            String courseType,
-            String offeredYear,
-            String sectionNo,
-            String professor,
-            Boolean yearRestricted,
-            Boolean majorRestricted,
-            String note
-    ) {
-        this.course = course;
-        this.category = category;
-        this.sectionGroup = sectionGroup;
-        this.courseType = courseType;
-        this.offeredYear = offeredYear;
-        this.sectionNo = sectionNo;
-        this.professor = professor;
-        this.yearRestricted = yearRestricted;
-        this.majorRestricted = majorRestricted;
-        this.note = note;
-    }
+    @Builder.Default
+    @OneToMany(mappedBy = "courseOffering", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OfferingTime> offeringTimes = new ArrayList<>();
 }

@@ -4,25 +4,26 @@ import java.util.Arrays;
 
 public enum CourseCategory {
 
-    GENERAL("교양"),
-    MAJOR("전공");
+    MAJOR_REQUIRED("전공필수"),
+    MAJOR_ELECTIVE("전공선택"),
+    GENERAL("교양");
 
-    private final String dbValue;
+    private final String label;
 
-    CourseCategory(String dbValue) {
-        this.dbValue = dbValue;
+    CourseCategory(String label) {
+        this.label = label;
     }
 
-    public String getDbValue() {
-        return dbValue;
+    public String getLabel() {
+        return label;
     }
 
-    public static CourseCategory fromDbValue(String dbValue) {
-        String normalizedDbValue = dbValue.trim();
+    public static CourseCategory fromLabel(String label) {
+        String normalizedDbValue = label.trim();
 
         return Arrays.stream(values())
-                .filter(category -> category.dbValue.equals(normalizedDbValue))
+                .filter(category -> category.label.equals(normalizedDbValue))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown course category: " + dbValue));
+                .orElseThrow(() -> new IllegalArgumentException("Unknown course category: " + label));
     }
 }

@@ -1,8 +1,9 @@
 package com.skhuthon_backend.domain.course.dto;
 
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
-import java.time.LocalTime;
 import lombok.Builder;
+
+import java.time.LocalTime;
 
 @Builder
 public record OfferingTimeResponseDto(
@@ -17,7 +18,7 @@ public record OfferingTimeResponseDto(
         return OfferingTimeResponseDto.builder()
                 .id(offeringTime.getId())
                 .room(offeringTime.getRoom())
-                .dayOfWeek(offeringTime.getDayOfWeek())
+                .dayOfWeek(offeringTime.getDayOfWeek().getLabel())
                 .startTime(offeringTime.getStartTime())
                 .endTime(offeringTime.getEndTime())
                 .build();
