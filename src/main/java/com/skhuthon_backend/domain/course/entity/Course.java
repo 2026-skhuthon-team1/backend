@@ -1,10 +1,11 @@
-package com.skhuthon_backend.domain.course;
+package com.skhuthon_backend.domain.course.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -12,7 +13,9 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(name = "course")
+@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Course {
 
     @Id
@@ -24,11 +27,4 @@ public class Course {
 
     @Column(name = "credits")
     private Integer credits;
-
-    @Builder
-    public Course(String courseCode, String courseName, Integer credits) {
-        this.courseCode = courseCode;
-        this.courseName = courseName;
-        this.credits = credits;
-    }
 }

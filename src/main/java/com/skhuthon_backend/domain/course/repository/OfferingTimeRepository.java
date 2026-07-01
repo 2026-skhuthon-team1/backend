@@ -1,7 +1,7 @@
 package com.skhuthon_backend.domain.course.repository;
 
-import com.skhuthon_backend.domain.course.CourseOffering;
-import com.skhuthon_backend.domain.course.OfferingTime;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;

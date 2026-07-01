@@ -1,22 +1,25 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.CourseCategory;
-import com.skhuthon_backend.domain.course.CourseOffering;
-import com.skhuthon_backend.domain.course.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
+import com.skhuthon_backend.domain.course.entity.CourseCategory;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 
 //- 전공/교양 후보 조회
 //- 학년 조건 적용
@@ -27,18 +30,23 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CourseCandidateProvider {
 
-    private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
-    private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
-    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
+    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전공필수", "전공선택", "교양");
+
+    // 소프트웨어융합학부(IT융합자율학부) 4학년 트랙 - 2~3학년은 공통 전공으로 개설되므로
+    // 트랙을 선언한 학생도 학부 공통 전공 과목을 자격 대상에 포함해야 함
+    private static final Set<String> SOFTWARE_CONVERGENCE_TRACKS = Set.of(
+            "소프트웨어공학전공", "정보통신공학전공", "컴퓨터공학전공"
+    );
+    private static final String SOFTWARE_CONVERGENCE_COMMON_MAJOR = "소프트웨어융합전공";
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
 
     public CandidateContext findCandidates(CourseCandidateRequestDto request) {
         return findCandidates(
-                request.getStudentMajors(),
-                request.getStudentYear(),
-                request.getCompletedCourseCodes()
+                request.studentMajors(),
+                request.studentYear(),
+                request.completedCourseCodes()
         );
     }
 
@@ -58,9 +66,9 @@ public class CourseCandidateProvider {
 
     public CandidateContext findSelectableOfferings(List<String> studentMajors) {
         List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
-                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCourseType()))
+                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCategory().getLabel()))
                 .collect(Collectors.toList());
-        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(GENERAL_CATEGORY);
+        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(CourseCategory.GENERAL);
         List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
 
         return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
@@ -71,7 +79,7 @@ public class CourseCandidateProvider {
             Integer studentYear,
             List<String> completedCourseCodes
     ) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors);
+        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors, studentYear);
         List<CourseOffering> generalOfferings = findGeneralOfferings(studentYear);
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
         Set<String> completedCodeSet = toSet(completedCourseCodes);
@@ -88,11 +96,29 @@ public class CourseCandidateProvider {
             return Collections.emptyList();
         }
 
-        return courseOfferingRepository.findByCategoryAndSectionGroupIn(MAJOR_CATEGORY, studentMajors);
+        List<String> eligibleMajors = resolveEligibleMajors(studentMajors);
+
+        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), eligibleMajors);
+    }
+
+    private List<CourseOffering> findMajorOfferings(List<String> studentMajors, Integer studentYear) {
+        return findMajorOfferings(studentMajors).stream()
+                .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> resolveEligibleMajors(List<String> studentMajors) {
+        Set<String> eligibleMajors = new LinkedHashSet<>(studentMajors);
+
+        if (studentMajors.stream().anyMatch(SOFTWARE_CONVERGENCE_TRACKS::contains)) {
+            eligibleMajors.add(SOFTWARE_CONVERGENCE_COMMON_MAJOR);
+        }
+
+        return new ArrayList<>(eligibleMajors);
     }
 
     private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
-        return courseOfferingRepository.findByCategory(GENERAL_CATEGORY).stream()
+        return courseOfferingRepository.findByCategory(CourseCategory.GENERAL).stream()
                 .filter(courseOffering -> isAvailableForStudentYear(courseOffering, studentYear))
                 .collect(Collectors.toList());
     }
@@ -102,11 +128,34 @@ public class CourseCandidateProvider {
             return true;
         }
 
-        if (courseOffering.getOfferedYear() == null) {
+        return isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear);
+    }
+
+    // offered_year는 '2.3.4', '23,4', '2,3,4,' 등 오타가 섞여 있으므로 1~4 숫자만 추출해 매칭한다.
+    // '전체'/빈값이거나 숫자를 하나도 추출하지 못하면 과도한 차단을 막기 위해 전 학년에게 노출한다.
+    private boolean isOfferedForStudentYear(String offeredYear, Integer studentYear) {
+        if (offeredYear == null || offeredYear.isBlank() || offeredYear.contains("전체")) {
             return true;
         }
 
-        return courseOffering.getOfferedYear().contains(String.valueOf(studentYear));
+        Set<Integer> offeredYears = parseOfferedYears(offeredYear);
+        if (offeredYears.isEmpty()) {
+            return true;
+        }
+
+        return offeredYears.contains(studentYear);
+    }
+
+    private Set<Integer> parseOfferedYears(String offeredYear) {
+        Set<Integer> years = new HashSet<>();
+
+        for (char character : offeredYear.toCharArray()) {
+            if (character >= '1' && character <= '4') {
+                years.add(character - '0');
+            }
+        }
+
+        return years;
     }
 
     private List<CourseOffering> mergeWithoutDuplicate(

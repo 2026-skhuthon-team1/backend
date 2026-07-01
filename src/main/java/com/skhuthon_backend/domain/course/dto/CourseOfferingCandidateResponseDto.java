@@ -1,9 +1,10 @@
 package com.skhuthon_backend.domain.course.dto;
 
-import com.skhuthon_backend.domain.course.Course;
-import com.skhuthon_backend.domain.course.CourseOffering;
-import java.util.List;
+import com.skhuthon_backend.domain.course.entity.Course;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import lombok.Builder;
+
+import java.util.List;
 
 @Builder
 public record CourseOfferingCandidateResponseDto(
@@ -13,7 +14,6 @@ public record CourseOfferingCandidateResponseDto(
         Integer credits,
         String category,
         String sectionGroup,
-        String courseType,
         String offeredYear,
         String sectionNo,
         String professor,
@@ -34,9 +34,8 @@ public record CourseOfferingCandidateResponseDto(
                 .courseCode(course.getCourseCode())
                 .courseName(course.getCourseName())
                 .credits(course.getCredits())
-                .category(courseOffering.getCategory().getDbValue())
+                .category(courseOffering.getCategory().getLabel())
                 .sectionGroup(courseOffering.getSectionGroup())
-                .courseType(courseOffering.getCourseType())
                 .offeredYear(courseOffering.getOfferedYear())
                 .sectionNo(courseOffering.getSectionNo())
                 .professor(courseOffering.getProfessor())

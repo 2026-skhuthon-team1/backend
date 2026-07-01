@@ -1,17 +1,19 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.CourseCategory;
-import com.skhuthon_backend.domain.course.CourseOffering;
-import com.skhuthon_backend.domain.course.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
+import com.skhuthon_backend.domain.course.entity.CourseCategory;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import java.util.stream.IntStream;
 
 //- DFS / 백트래킹
 //- 학점 합 검사
@@ -22,8 +24,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TimetableCombinationGenerator {
 
-    private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
-    private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
     private static final int MAX_COMBINATION_COUNT = 100;
 
     private final TimeConflictChecker timeConflictChecker;
@@ -34,8 +34,12 @@ public class TimetableCombinationGenerator {
             TimetableCombinationRequestDto request
     ) {
         List<TimetableCombination> results = new ArrayList<>();
-        int[] remainingMajorCredits = calculateRemainingCreditsByCategory(candidates, MAJOR_CATEGORY);
-        int[] remainingGeneralCredits = calculateRemainingCreditsByCategory(candidates, GENERAL_CATEGORY);
+        int[] remainingElectiveCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_ELECTIVE);
+        int[] remainingRequiredCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_REQUIRED);
+        int[] remainingMajorCredits = IntStream.range(0, remainingElectiveCredits.length)
+                .map(index -> remainingElectiveCredits[index] + remainingRequiredCredits[index])
+                .toArray();
+        int[] remainingGeneralCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.GENERAL);
 
         backtrack(
                 candidates,
@@ -116,9 +120,9 @@ public class TimetableCombinationGenerator {
         int nextMajorCredits = majorCredits;
         int nextGeneralCredits = generalCredits;
 
-        if (candidate.getCategory() == MAJOR_CATEGORY) {
+        if (candidate.getCategory() == CourseCategory.MAJOR_ELECTIVE || candidate.getCategory() == CourseCategory.MAJOR_REQUIRED) {
             nextMajorCredits += credits;
-        } else if (candidate.getCategory() == GENERAL_CATEGORY) {
+        } else if (candidate.getCategory() == CourseCategory.GENERAL) {
             nextGeneralCredits += credits;
         }
 
