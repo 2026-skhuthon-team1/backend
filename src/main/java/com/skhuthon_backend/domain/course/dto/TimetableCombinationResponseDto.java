@@ -9,6 +9,7 @@ public record TimetableCombinationResponseDto(
         Integer totalCredits,
         Integer majorCredits,
         Integer generalCredits,
+        Integer attendanceDays,
         List<String> freeDays,
         Boolean excludeFirstPeriod,
         List<CourseOfferingCandidateResponseDto> offerings

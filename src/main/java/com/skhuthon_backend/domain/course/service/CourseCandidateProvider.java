@@ -4,10 +4,7 @@ import com.skhuthon_backend.domain.course.CourseCategory;
 import com.skhuthon_backend.domain.course.CourseOffering;
 import com.skhuthon_backend.domain.course.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
-import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
-import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
-import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
 import java.util.ArrayList;
@@ -19,73 +16,71 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Component;
 
-@Service
+//- 전공/교양 후보 조회
+//- 학년 조건 적용
+//- 기이수 과목 제외
+//- OfferingTime 조회
+
+@Component
 @RequiredArgsConstructor
-public class TimetableEngineService {
+public class CourseCandidateProvider {
 
-    private final CourseCandidateProvider courseCandidateProvider;
-    private final TimetableConstraintFilter timetableConstraintFilter;
-    private final TimetableCombinationGenerator timetableCombinationGenerator;
-    private final TimetableCombinationMapper timetableCombinationMapper;
     private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
     private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
+    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
 
-    @Transactional(readOnly = true)
-    public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
-        CandidateContext candidateContext = courseCandidateProvider.findAllOfferings();
-
-        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseOfferingCandidateResponseDto> findSelectableOfferings(List<String> studentMajors) {
-        CandidateContext candidateContext = courseCandidateProvider.findSelectableOfferings(studentMajors);
-
-        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
-    }
-
-    @Transactional(readOnly = true)
-    public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
-        CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
-        List<CourseOffering> filteredOfferings = timetableConstraintFilter.apply(
-                candidateContext.offerings(),
-                candidateContext.timesByOfferingId(),
-                request
-        );
-        List<TimetableCombination> combinations = timetableCombinationGenerator.generate(
-                filteredOfferings,
-                candidateContext.timesByOfferingId(),
-                request
-        );
-
-        return timetableCombinationMapper.toTimetableResponses(
-                combinations,
-                candidateContext.timesByOfferingId(),
-                request
+    public CandidateContext findCandidates(CourseCandidateRequestDto request) {
+        return findCandidates(
+                request.getStudentMajors(),
+                request.getStudentYear(),
+                request.getCompletedCourseCodes()
         );
     }
 
-    @Transactional(readOnly = true)
-    public List<CourseOfferingCandidateResponseDto> findCandidateOfferings(CourseCandidateRequestDto request) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(request.getStudentMajors());
-        List<CourseOffering> generalOfferings = findGeneralOfferings(request.getStudentYear());
+    public CandidateContext findCandidates(TimetableCombinationRequestDto request) {
+        return findCandidates(
+                request.studentMajors(),
+                request.studentYear(),
+                request.completedCourseCodes()
+        );
+    }
 
+    public CandidateContext findAllOfferings() {
+        List<CourseOffering> courseOfferings = courseOfferingRepository.findAll();
+
+        return new CandidateContext(courseOfferings, findTimesByOfferingId(courseOfferings));
+    }
+
+    public CandidateContext findSelectableOfferings(List<String> studentMajors) {
+        List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
+                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCourseType()))
+                .collect(Collectors.toList());
+        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(GENERAL_CATEGORY);
+        List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
+
+        return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
+    }
+
+    private CandidateContext findCandidates(
+            List<String> studentMajors,
+            Integer studentYear,
+            List<String> completedCourseCodes
+    ) {
+        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors);
+        List<CourseOffering> generalOfferings = findGeneralOfferings(studentYear);
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
-        Set<String> completedCodeSet = toSet(request.getCompletedCourseCodes());
+        Set<String> completedCodeSet = toSet(completedCourseCodes);
 
         List<CourseOffering> filteredOfferings = candidateOfferings.stream()
                 .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
                 .collect(Collectors.toList());
 
-        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(filteredOfferings);
-
-        return toCourseOfferingResponses(filteredOfferings, timesByOfferingId);
+        return new CandidateContext(filteredOfferings, findTimesByOfferingId(filteredOfferings));
     }
 
     private List<CourseOffering> findMajorOfferings(List<String> studentMajors) {
@@ -141,23 +136,5 @@ public class TimetableEngineService {
 
         return offeringTimeRepository.findByCourseOfferingIn(courseOfferings).stream()
                 .collect(Collectors.groupingBy(offeringTime -> offeringTime.getCourseOffering().getId()));
-    }
-
-    private List<OfferingTimeResponseDto> toTimeResponses(List<OfferingTime> offeringTimes) {
-        return offeringTimes.stream()
-                .map(OfferingTimeResponseDto::from)
-                .collect(Collectors.toList());
-    }
-
-    private List<CourseOfferingCandidateResponseDto> toCourseOfferingResponses(
-            List<CourseOffering> courseOfferings,
-            Map<Long, List<OfferingTime>> timesByOfferingId
-    ) {
-        return courseOfferings.stream()
-                .map(courseOffering -> CourseOfferingCandidateResponseDto.of(
-                        courseOffering,
-                        toTimeResponses(timesByOfferingId.getOrDefault(courseOffering.getId(), Collections.emptyList()))
-                ))
-                .collect(Collectors.toList());
     }
 }

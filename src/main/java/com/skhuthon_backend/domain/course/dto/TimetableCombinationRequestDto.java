@@ -9,8 +9,14 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Builder
 public record TimetableCombinationRequestDto(
