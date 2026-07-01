@@ -4,12 +4,16 @@ import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
+import com.skhuthon_backend.domain.course.dto.TimetableGenerateRequestDto;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.parser.TranscriptParserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +23,7 @@ public class TimetableEngineService {
     private final TimetableConstraintFilter timetableConstraintFilter;
     private final TimetableCombinationGenerator timetableCombinationGenerator;
     private final TimetableCombinationMapper timetableCombinationMapper;
+    private final TranscriptParserService transcriptParserService;
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
@@ -60,5 +65,24 @@ public class TimetableEngineService {
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
 
         return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TimetableCombinationResponseDto> generateTimetable(
+            TimetableGenerateRequestDto request,
+            MultipartFile transcript
+    ) {
+        Set<String> completedCourseCodes = transcriptParserService.parse(transcript);
+        TimetableCombinationRequestDto combinationRequest =
+                new TimetableCombinationRequestDto(
+                        request.getStudentMajors(),
+                        request.getStudentYear(),
+                        request.getTargetMajorCredits(),
+                        request.getTargetGeneralCredits(),
+                        request.getFreeDays(),
+                        request.getExcludeFirstPeriod(),
+                        completedCourseCodes.stream().toList()
+                );
+        return generateCombinations(combinationRequest);
     }
 }
