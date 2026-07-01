@@ -25,7 +25,7 @@ public class CourseCandidateRequestDto {
 
     @Schema(description = "학생의 현재 학년", example = "3")
     @NotNull(message = "학년은 필수입니다.")
-    @Min(value = 1, message = "학년은 1 이상이어야 합니다.")
+    @Min(value = 2, message = "학년은 2 이상이어야 합니다.")
     @Max(value = 4, message = "학년은 4 이하여야 합니다.")
     private Integer studentYear;
 
