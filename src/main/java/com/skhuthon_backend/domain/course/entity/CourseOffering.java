@@ -1,5 +1,6 @@
-package com.skhuthon_backend.domain.course;
+package com.skhuthon_backend.domain.course.entity;
 
+import com.skhuthon_backend.domain.course.CourseCategoryConverter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;

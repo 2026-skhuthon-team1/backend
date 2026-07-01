@@ -1,8 +1,8 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.CourseCategory;
-import com.skhuthon_backend.domain.course.CourseOffering;
-import com.skhuthon_backend.domain.course.OfferingTime;
+import com.skhuthon_backend.domain.course.entity.CourseCategory;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;

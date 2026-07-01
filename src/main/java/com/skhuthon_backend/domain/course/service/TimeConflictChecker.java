@@ -1,6 +1,6 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.OfferingTime;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import java.util.List;
 import org.springframework.stereotype.Component;
 

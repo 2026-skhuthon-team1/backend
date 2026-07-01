@@ -1,7 +1,7 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.CourseOffering;
-import com.skhuthon_backend.domain.course.OfferingTime;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import java.time.LocalTime;
 import java.util.Collection;

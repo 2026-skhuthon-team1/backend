@@ -1,4 +1,4 @@
-package com.skhuthon_backend.domain.course;
+package com.skhuthon_backend.domain.course.entity;
 
 import java.util.Arrays;
 

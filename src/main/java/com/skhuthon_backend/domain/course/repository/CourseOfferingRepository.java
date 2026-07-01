@@ -1,8 +1,8 @@
 package com.skhuthon_backend.domain.course.repository;
 
-import com.skhuthon_backend.domain.course.Course;
-import com.skhuthon_backend.domain.course.CourseCategory;
-import com.skhuthon_backend.domain.course.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.Course;
+import com.skhuthon_backend.domain.course.entity.CourseCategory;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

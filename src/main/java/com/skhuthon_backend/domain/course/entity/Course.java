@@ -1,4 +1,4 @@
-package com.skhuthon_backend.domain.course;
+package com.skhuthon_backend.domain.course.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

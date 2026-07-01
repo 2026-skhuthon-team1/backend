@@ -1,7 +1,7 @@
 package com.skhuthon_backend.domain.course.dto;
 
-import com.skhuthon_backend.domain.course.Course;
-import com.skhuthon_backend.domain.course.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.Course;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import java.util.List;
 import lombok.Builder;
 

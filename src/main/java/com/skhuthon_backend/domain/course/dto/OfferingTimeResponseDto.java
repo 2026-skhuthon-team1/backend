@@ -1,6 +1,6 @@
 package com.skhuthon_backend.domain.course.dto;
 
-import com.skhuthon_backend.domain.course.OfferingTime;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import java.time.LocalTime;
 import lombok.Builder;
 
