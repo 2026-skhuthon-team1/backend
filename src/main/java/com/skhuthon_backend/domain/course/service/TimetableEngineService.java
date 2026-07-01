@@ -1,15 +1,19 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.entity.CourseCategory;
-import com.skhuthon_backend.domain.course.entity.CourseOffering;
-import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
+import com.skhuthon_backend.domain.course.entity.CourseCategory;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,9 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -30,8 +31,6 @@ public class TimetableEngineService {
     private final TimetableConstraintFilter timetableConstraintFilter;
     private final TimetableCombinationGenerator timetableCombinationGenerator;
     private final TimetableCombinationMapper timetableCombinationMapper;
-    private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
-    private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
@@ -73,11 +72,11 @@ public class TimetableEngineService {
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findCandidateOfferings(CourseCandidateRequestDto request) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(request.getStudentMajors());
-        List<CourseOffering> generalOfferings = findGeneralOfferings(request.getStudentYear());
+        List<CourseOffering> majorOfferings = findMajorOfferings(request.studentMajors());
+        List<CourseOffering> generalOfferings = findGeneralOfferings(request.studentYear());
 
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
-        Set<String> completedCodeSet = toSet(request.getCompletedCourseCodes());
+        Set<String> completedCodeSet = toSet(request.completedCourseCodes());
 
         List<CourseOffering> filteredOfferings = candidateOfferings.stream()
                 .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
@@ -93,11 +92,11 @@ public class TimetableEngineService {
             return Collections.emptyList();
         }
 
-        return courseOfferingRepository.findByCategoryAndSectionGroupIn(MAJOR_CATEGORY, studentMajors);
+        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), studentMajors);
     }
 
     private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
-        return courseOfferingRepository.findByCategory(GENERAL_CATEGORY).stream()
+        return courseOfferingRepository.findByCategory(CourseCategory.GENERAL).stream()
                 .filter(courseOffering -> isAvailableForStudentYear(courseOffering, studentYear))
                 .collect(Collectors.toList());
     }

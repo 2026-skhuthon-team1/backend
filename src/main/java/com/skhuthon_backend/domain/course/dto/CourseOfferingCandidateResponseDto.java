@@ -2,8 +2,9 @@ package com.skhuthon_backend.domain.course.dto;
 
 import com.skhuthon_backend.domain.course.entity.Course;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
-import java.util.List;
 import lombok.Builder;
+
+import java.util.List;
 
 @Builder
 public record CourseOfferingCandidateResponseDto(
@@ -13,7 +14,6 @@ public record CourseOfferingCandidateResponseDto(
         Integer credits,
         String category,
         String sectionGroup,
-        String courseType,
         String offeredYear,
         String sectionNo,
         String professor,

@@ -1,27 +1,25 @@
 package com.skhuthon_backend.domain.course.service;
 
-import com.skhuthon_backend.domain.course.entity.CourseCategory;
-import com.skhuthon_backend.domain.course.entity.CourseOffering;
-import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
+import com.skhuthon_backend.domain.course.entity.CourseCategory;
+import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.OfferingTime;
+import org.springframework.stereotype.Component;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.springframework.stereotype.Component;
 
 //- DTO 변환
 //- 총학점, 전공학점, 교양학점, 등교일수 계산
 
 @Component
 public class TimetableCombinationMapper {
-
-    private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
-    private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
 
     public List<CourseOfferingCandidateResponseDto> toCourseOfferingResponses(CandidateContext candidateContext) {
         return toCourseOfferingResponses(candidateContext.offerings(), candidateContext.timesByOfferingId());
@@ -48,8 +46,8 @@ public class TimetableCombinationMapper {
             Map<Long, List<OfferingTime>> timesByOfferingId,
             TimetableCombinationRequestDto request
     ) {
-        int majorCredits = calculateCreditsByCategory(combination.offerings(), MAJOR_CATEGORY);
-        int generalCredits = calculateCreditsByCategory(combination.offerings(), GENERAL_CATEGORY);
+        int majorCredits = calculateCreditsByCategory(combination.offerings(), CourseCategory.MAJOR_ELECTIVE) + calculateCreditsByCategory(combination.offerings(), CourseCategory.MAJOR_REQUIRED) ;
+        int generalCredits = calculateCreditsByCategory(combination.offerings(), CourseCategory.GENERAL);
 
         return TimetableCombinationResponseDto.builder()
                 .timetableId(timetableId)

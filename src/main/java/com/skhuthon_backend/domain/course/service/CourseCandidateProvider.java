@@ -1,12 +1,15 @@
 package com.skhuthon_backend.domain.course.service;
 
+import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
+import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
-import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
-import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -15,8 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 
 //- 전공/교양 후보 조회
 //- 학년 조건 적용
@@ -27,18 +28,16 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CourseCandidateProvider {
 
-    private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
-    private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
-    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
+    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전공필수", "전공선택", "교양");
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
 
     public CandidateContext findCandidates(CourseCandidateRequestDto request) {
         return findCandidates(
-                request.getStudentMajors(),
-                request.getStudentYear(),
-                request.getCompletedCourseCodes()
+                request.studentMajors(),
+                request.studentYear(),
+                request.completedCourseCodes()
         );
     }
 
@@ -58,9 +57,9 @@ public class CourseCandidateProvider {
 
     public CandidateContext findSelectableOfferings(List<String> studentMajors) {
         List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
-                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCourseType()))
+                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCategory().getLabel()))
                 .collect(Collectors.toList());
-        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(GENERAL_CATEGORY);
+        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(CourseCategory.GENERAL);
         List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
 
         return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
@@ -88,11 +87,11 @@ public class CourseCandidateProvider {
             return Collections.emptyList();
         }
 
-        return courseOfferingRepository.findByCategoryAndSectionGroupIn(MAJOR_CATEGORY, studentMajors);
+        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), studentMajors);
     }
 
     private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
-        return courseOfferingRepository.findByCategory(GENERAL_CATEGORY).stream()
+        return courseOfferingRepository.findByCategory(CourseCategory.GENERAL).stream()
                 .filter(courseOffering -> isAvailableForStudentYear(courseOffering, studentYear))
                 .collect(Collectors.toList());
     }
