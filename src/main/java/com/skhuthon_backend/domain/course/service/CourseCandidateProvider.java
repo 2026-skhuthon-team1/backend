@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -78,7 +79,7 @@ public class CourseCandidateProvider {
             Integer studentYear,
             List<String> completedCourseCodes
     ) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors);
+        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors, studentYear);
         List<CourseOffering> generalOfferings = findGeneralOfferings(studentYear);
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
         Set<String> completedCodeSet = toSet(completedCourseCodes);
@@ -98,6 +99,12 @@ public class CourseCandidateProvider {
         List<String> eligibleMajors = resolveEligibleMajors(studentMajors);
 
         return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), eligibleMajors);
+    }
+
+    private List<CourseOffering> findMajorOfferings(List<String> studentMajors, Integer studentYear) {
+        return findMajorOfferings(studentMajors).stream()
+                .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
+                .collect(Collectors.toList());
     }
 
     private List<String> resolveEligibleMajors(List<String> studentMajors) {
@@ -121,11 +128,34 @@ public class CourseCandidateProvider {
             return true;
         }
 
-        if (courseOffering.getOfferedYear() == null) {
+        return isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear);
+    }
+
+    // offered_year는 '2.3.4', '23,4', '2,3,4,' 등 오타가 섞여 있으므로 1~4 숫자만 추출해 매칭한다.
+    // '전체'/빈값이거나 숫자를 하나도 추출하지 못하면 과도한 차단을 막기 위해 전 학년에게 노출한다.
+    private boolean isOfferedForStudentYear(String offeredYear, Integer studentYear) {
+        if (offeredYear == null || offeredYear.isBlank() || offeredYear.contains("전체")) {
             return true;
         }
 
-        return courseOffering.getOfferedYear().contains(String.valueOf(studentYear));
+        Set<Integer> offeredYears = parseOfferedYears(offeredYear);
+        if (offeredYears.isEmpty()) {
+            return true;
+        }
+
+        return offeredYears.contains(studentYear);
+    }
+
+    private Set<Integer> parseOfferedYears(String offeredYear) {
+        Set<Integer> years = new HashSet<>();
+
+        for (char character : offeredYear.toCharArray()) {
+            if (character >= '1' && character <= '4') {
+                years.add(character - '0');
+            }
+        }
+
+        return years;
     }
 
     private List<CourseOffering> mergeWithoutDuplicate(
