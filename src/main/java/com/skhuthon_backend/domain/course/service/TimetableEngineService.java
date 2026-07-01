@@ -32,7 +32,6 @@ public class TimetableEngineService {
     private final TimetableCombinationMapper timetableCombinationMapper;
     private static final CourseCategory MAJOR_CATEGORY = CourseCategory.MAJOR;
     private static final CourseCategory GENERAL_CATEGORY = CourseCategory.GENERAL;
-    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전필", "전선");
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
@@ -73,26 +72,6 @@ public class TimetableEngineService {
     }
 
     @Transactional(readOnly = true)
-    public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
-        List<CourseOffering> courseOfferings = courseOfferingRepository.findAll();
-        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(courseOfferings);
-
-        return toCourseOfferingResponses(courseOfferings, timesByOfferingId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<CourseOfferingCandidateResponseDto> findSelectableOfferings(List<String> studentMajors) {
-        List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
-                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCourseType()))
-                .collect(Collectors.toList());
-        List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(GENERAL_CATEGORY);
-        List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
-        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(selectableOfferings);
-
-        return toCourseOfferingResponses(selectableOfferings, timesByOfferingId);
-    }
-
-    @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findCandidateOfferings(CourseCandidateRequestDto request) {
         List<CourseOffering> majorOfferings = findMajorOfferings(request.getStudentMajors());
         List<CourseOffering> generalOfferings = findGeneralOfferings(request.getStudentYear());
@@ -116,7 +95,6 @@ public class TimetableEngineService {
 
         return courseOfferingRepository.findByCategoryAndSectionGroupIn(MAJOR_CATEGORY, studentMajors);
     }
-        CandidateContext candidateContext = courseCandidateProvider.findCandidates(request);
 
     private List<CourseOffering> findGeneralOfferings(Integer studentYear) {
         return courseOfferingRepository.findByCategory(GENERAL_CATEGORY).stream()
@@ -181,15 +159,5 @@ public class TimetableEngineService {
                         toTimeResponses(timesByOfferingId.getOrDefault(courseOffering.getId(), Collections.emptyList()))
                 ))
                 .collect(Collectors.toList());
-    }
-
-    private boolean isTimeConflict(OfferingTime first, OfferingTime second) {
-        if (!first.getDayOfWeek().equals(second.getDayOfWeek())) {
-            return false;
-        }
-
-        return first.getStartTime().isBefore(second.getEndTime())
-                && second.getStartTime().isBefore(first.getEndTime());
-        return timetableCombinationMapper.toCourseOfferingResponses(candidateContext);
     }
 }
