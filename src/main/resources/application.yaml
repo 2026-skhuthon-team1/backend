@@ -13,3 +13,7 @@ spring:
       hibernate:
         format_sql: false
         highlight_sql: false
+
+ai:
+  service:
+    base-url: ${AI_SERVICE_BASE_URL}
