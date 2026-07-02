@@ -1,5 +1,6 @@
 package com.skhuthon_backend.domain.course.controller;
 
+import com.skhuthon_backend.domain.ai.dto.AiTimetableRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableGenerateRequestDto;
@@ -42,7 +43,7 @@ public class TimetableController {
             value = "/generate",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    public ResponseEntity<List<TimetableCombinationResponseDto>> generate(
+    public ResponseEntity<AiTimetableRequestDto> generate(
 
             @RequestPart("request")
             @Valid TimetableGenerateRequestDto request,
@@ -52,7 +53,7 @@ public class TimetableController {
     ) {
 
         return ResponseEntity.ok(
-                timetableEngineService.generateTimetable(request, file)
+                timetableEngineService.generateAiRequest(request, file)
         );
     }
 }

@@ -1,5 +1,10 @@
 package com.skhuthon_backend.domain.course.service;
 
+import com.skhuthon_backend.domain.ai.dto.AiRankingResponseDto;
+import com.skhuthon_backend.domain.ai.dto.AiTimetableRequestDto;
+import com.skhuthon_backend.domain.ai.model.AiTimetableMapper;
+import com.skhuthon_backend.domain.ai.model.TimetableCandidateReducer;
+import com.skhuthon_backend.domain.ai.service.FastApiService;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
@@ -24,6 +29,9 @@ public class TimetableEngineService {
     private final TimetableCombinationGenerator timetableCombinationGenerator;
     private final TimetableCombinationMapper timetableCombinationMapper;
     private final TranscriptParserService transcriptParserService;
+    private final FastApiService fastApiService;
+    private final AiTimetableMapper aiTimetableMapper;
+    private final TimetableCandidateReducer timetableCandidateReducer;
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
@@ -52,9 +60,13 @@ public class TimetableEngineService {
                 candidateContext.timesByOfferingId(),
                 request
         );
+        List<TimetableCombination> reducedCombinations =
+                timetableCandidateReducer.reduce(combinations);
+
+        List<AiRankingResponseDto> rankings = fastApiService.rank(reducedCombinations);
 
         return timetableCombinationMapper.toTimetableResponses(
-                combinations,
+                reducedCombinations,
                 candidateContext.timesByOfferingId(),
                 request
         );
@@ -84,5 +96,47 @@ public class TimetableEngineService {
                         completedCourseCodes.stream().toList()
                 );
         return generateCombinations(combinationRequest);
+    }
+
+    @Transactional(readOnly = true)
+    public AiTimetableRequestDto generateAiRequest(
+            TimetableGenerateRequestDto request,
+            MultipartFile transcript
+    ) {
+
+        Set<String> completedCourseCodes = transcriptParserService.parse(transcript);
+
+        TimetableCombinationRequestDto combinationRequest =
+                new TimetableCombinationRequestDto(
+                        request.getStudentMajors(),
+                        request.getStudentYear(),
+                        request.getTargetMajorCredits(),
+                        request.getTargetGeneralCredits(),
+                        request.getFreeDays(),
+                        request.getExcludeFirstPeriod(),
+                        completedCourseCodes.stream().toList()
+                );
+
+        CandidateContext context =
+                courseCandidateProvider.findCandidates(combinationRequest);
+
+        List<CourseOffering> filteredOfferings =
+                timetableConstraintFilter.apply(
+                        context.offerings(),
+                        context.timesByOfferingId(),
+                        combinationRequest
+                );
+
+        List<TimetableCombination> combinations =
+                timetableCombinationGenerator.generate(
+                        filteredOfferings,
+                        context.timesByOfferingId(),
+                        combinationRequest
+                );
+        List<TimetableCombination> reducedCombinations =
+                timetableCandidateReducer.reduce(combinations);
+        return aiTimetableMapper.toRequest(
+                reducedCombinations
+        );
     }
 }

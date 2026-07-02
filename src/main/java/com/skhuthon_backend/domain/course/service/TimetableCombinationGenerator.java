@@ -1,8 +1,10 @@
 package com.skhuthon_backend.domain.course.service;
 
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
+import com.skhuthon_backend.domain.course.dto.TimetableFeature;
 import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.domain.course.entity.DayOfWeek;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 //- DFS / 백트래킹
@@ -27,6 +30,7 @@ public class TimetableCombinationGenerator {
     private static final int MAX_COMBINATION_COUNT = 100;
 
     private final TimeConflictChecker timeConflictChecker;
+    private final TimetableFeatureExtractor timetableFeatureExtractor;
 
     public List<TimetableCombination> generate(
             List<CourseOffering> candidates,
@@ -34,6 +38,7 @@ public class TimetableCombinationGenerator {
             TimetableCombinationRequestDto request
     ) {
         List<TimetableCombination> results = new ArrayList<>();
+        Set<String> signatures = new HashSet<>();
         int[] remainingElectiveCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_ELECTIVE);
         int[] remainingRequiredCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_REQUIRED);
         int[] remainingMajorCredits = IntStream.range(0, remainingElectiveCredits.length)
@@ -53,7 +58,8 @@ public class TimetableCombinationGenerator {
                 new HashSet<>(),
                 0,
                 0,
-                results
+                results,
+                signatures
         );
 
         return results;
@@ -71,18 +77,29 @@ public class TimetableCombinationGenerator {
             Set<String> selectedCourseCodes,
             int majorCredits,
             int generalCredits,
-            List<TimetableCombination> results
+            List<TimetableCombination> results,
+            Set<String> signatures
     ) {
-        if (results.size() >= MAX_COMBINATION_COUNT) {
+        if (signatures.size() >= MAX_COMBINATION_COUNT) {
             return;
         }
 
         if (majorCredits == request.targetMajorCredits()
                 && generalCredits == request.targetGeneralCredits()) {
-            results.add(new TimetableCombination(
+
+            if (!hasRequiredFreeDays(selectedTimes, request.freeDays())) {
+                return;
+            }
+
+            TimetableCombination combination = new TimetableCombination(
                     List.copyOf(selectedOfferings),
                     List.copyOf(selectedTimes)
-            ));
+            );
+
+            TimetableFeature feature = timetableFeatureExtractor.extract(combination);
+            if (signatures.add(feature.signature())) {
+                results.add(combination);
+            }
             return;
         }
 
@@ -110,7 +127,8 @@ public class TimetableCombinationGenerator {
                 selectedCourseCodes,
                 majorCredits,
                 generalCredits,
-                results
+                results,
+                signatures
         );
 
         if (selectedCourseCodes.contains(courseCode)) {
@@ -152,7 +170,8 @@ public class TimetableCombinationGenerator {
                 selectedCourseCodes,
                 nextMajorCredits,
                 nextGeneralCredits,
-                results
+                results,
+                signatures
         );
 
         selectedCourseCodes.remove(courseCode);
@@ -179,5 +198,23 @@ public class TimetableCombinationGenerator {
         }
 
         return credits;
+    }
+
+    private boolean hasRequiredFreeDays(
+            List<OfferingTime> selectedTimes,
+            List<String> requiredFreeDays
+    ) {
+
+        if (requiredFreeDays == null || requiredFreeDays.isEmpty()) {
+            return true;
+        }
+
+        Set<String> attendanceDays = selectedTimes.stream()
+                .map(OfferingTime::getDayOfWeek)
+                .map(DayOfWeek::getLabel)
+                .collect(Collectors.toSet());
+
+        return requiredFreeDays.stream()
+                .noneMatch(attendanceDays::contains);
     }
 }
