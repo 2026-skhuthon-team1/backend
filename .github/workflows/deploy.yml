@@ -38,7 +38,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_IP }}
           username: ${{ secrets.REMOTE_USERNAME }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           source: "app.jar,Dockerfile"
           target: "/home/${{ secrets.REMOTE_USERNAME }}/Docker/backend"
@@ -48,7 +48,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_IP }}
           username: ${{ secrets.REMOTE_USERNAME }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
           script: |
             set -e
