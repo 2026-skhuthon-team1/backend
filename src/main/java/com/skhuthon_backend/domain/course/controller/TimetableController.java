@@ -1,9 +1,9 @@
 package com.skhuthon_backend.domain.course.controller;
 
-import com.skhuthon_backend.domain.ai.dto.AiTimetableRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableGenerateRequestDto;
+import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto;
 import com.skhuthon_backend.domain.course.service.TimetableEngineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -59,7 +59,7 @@ public class TimetableController {
             value = "/generate",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    public ResponseEntity<AiTimetableRequestDto> generate(
+    public ResponseEntity<List<TimetableRecommendationResponseDto>> generate(
 
             @RequestPart("request")
             @Valid TimetableGenerateRequestDto request,
@@ -69,7 +69,7 @@ public class TimetableController {
     ) {
 
         return ResponseEntity.ok(
-                timetableEngineService.generateAiRequest(request, file)
+                timetableEngineService.generateRecommendations(request, file)
         );
     }
 }
