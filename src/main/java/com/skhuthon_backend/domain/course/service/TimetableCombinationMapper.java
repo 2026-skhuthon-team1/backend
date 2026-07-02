@@ -1,9 +1,12 @@
 package com.skhuthon_backend.domain.course.service;
 
+import com.skhuthon_backend.domain.ai.dto.AiRankingResponseDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
+import com.skhuthon_backend.domain.course.dto.RecommendedCourseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
+import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto;
 import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
@@ -12,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -91,6 +95,54 @@ public class TimetableCombinationMapper {
                 .map(OfferingTime::getDayOfWeek)
                 .distinct()
                 .count();
+    }
+
+    public List<TimetableRecommendationResponseDto> toRecommendationResponses(
+            List<AiRankingResponseDto> rankings,
+            List<TimetableCombination> combinations
+    ) {
+        return rankings.stream()
+                .map(ranking -> toRecommendationResponse(ranking, combinations))
+                .collect(Collectors.toList());
+    }
+
+    private TimetableRecommendationResponseDto toRecommendationResponse(
+            AiRankingResponseDto ranking,
+            List<TimetableCombination> combinations
+    ) {
+        TimetableCombination combination = combinations.get(Math.toIntExact(ranking.timetableId() - 1));
+
+        return TimetableRecommendationResponseDto.builder()
+                .timetableId(ranking.timetableId())
+                .score(ranking.score())
+                .rank(ranking.rank())
+                .tags(ranking.tags())
+                .courses(toRecommendedCourses(combination))
+                .build();
+    }
+
+    private List<RecommendedCourseDto> toRecommendedCourses(TimetableCombination combination) {
+        return combination.offerings().stream()
+                .map(courseOffering -> toRecommendedCourse(courseOffering, combination.times()))
+                .collect(Collectors.toList());
+    }
+
+    private RecommendedCourseDto toRecommendedCourse(CourseOffering courseOffering, List<OfferingTime> times) {
+        return RecommendedCourseDto.builder()
+                .courseName(courseOffering.getCourse().getCourseName())
+                .room(findRoom(courseOffering, times))
+                .category(courseOffering.getCategory().getLabel())
+                .professor(courseOffering.getProfessor())
+                .build();
+    }
+
+    private String findRoom(CourseOffering courseOffering, List<OfferingTime> times) {
+        return times.stream()
+                .filter(time -> time.getCourseOffering().getId().equals(courseOffering.getId()))
+                .map(OfferingTime::getRoom)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private int getCredits(CourseOffering courseOffering) {
