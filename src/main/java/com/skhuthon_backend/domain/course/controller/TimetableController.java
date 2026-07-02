@@ -39,6 +39,22 @@ public class TimetableController {
         return ResponseEntity.ok(timetableEngineService.generateCombinations(request));
     }
 
+    @Operation(
+            summary = "엑셀 파일 및 조건을 사용한 시간표 조합 생성",
+            description =
+                    """
+                    사용자의 시간표를 생성합니다.
+                    
+                    body로 사용자의 전공명(최대 2개), 현재 학년(2~4 정수),
+                    목표전공학점, 목표교양학점, 필수공강요일, 1교시 제외 여부를 json으로 받고,
+                    종정시에서 내려받을 수 있는 수강과목 엑셀 파일 또한 필요로 합니다.
+                    
+                    반환값으로, 각 시간표의 점수, 순위, 태그, 강의를 넘깁니다.
+                    
+                    엑셀 파일에 기본적이로 존재하는 '과목코드' 컬럼이 존재하지 않으면 에러가 발생합니다.
+                    또한 엑셀 파일을 업로드하지 않거나 다른 파일을 업로드하여도 에러가 발생합니다.
+                    """
+    )
     @PostMapping(
             value = "/generate",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
