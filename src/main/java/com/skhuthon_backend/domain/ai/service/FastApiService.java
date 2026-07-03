@@ -27,6 +27,7 @@ public class FastApiService {
     public List<AiRankingResponseDto> rank(
             List<TimetableCombination> combinations
     ) {
+        log.info("AI 랭킹 서버로 전송할 시간표 조합 수={}", combinations.size());
 
         AiTimetableRequestDto request =
                 aiTimetableMapper.toRequest(
