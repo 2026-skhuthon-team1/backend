@@ -133,10 +133,6 @@ public class TimetableEngineService {
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request, completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(candidateContext, fixedContext);
 
-        if (!areAllowedByConstraints(fixedContext, timesByOfferingId, request)) {
-            return Collections.emptyList();
-        }
-
         List<CourseOffering> filteredOfferings = timetableConstraintFilter.apply(
                 candidateContext.offerings(),
                 timesByOfferingId,
@@ -179,7 +175,7 @@ public class TimetableEngineService {
                         request.getFreeDays(),
                         request.getExcludeFirstPeriod(),
                         completedCourseCodes.stream().toList(),
-                        request.getGeneralRequiredCourses()
+                        request.getFixedCourses()
                 );
 
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(combinationRequest);
@@ -194,9 +190,6 @@ public class TimetableEngineService {
         }
 
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(context, fixedContext);
-        if (!areAllowedByConstraints(fixedContext, timesByOfferingId, combinationRequest)) {
-            return Collections.emptyList();
-        }
 
         List<CourseOffering> filteredOfferings =
                 timetableConstraintFilter.apply(
@@ -243,7 +236,7 @@ public class TimetableEngineService {
     private CandidateContext resolveFixedGeneralRequiredContext(TimetableCombinationRequestDto request) {
         validateGeneralRequiredSelections(request);
 
-        return courseCandidateProvider.findSelectedGeneralRequiredOfferings(request.generalRequiredCourses());
+        return courseCandidateProvider.findSelectedGeneralRequiredOfferings(request.fixedCourses());
     }
 
     private TimetableCombinationRequestDto toFirstYearCombinationRequest(
@@ -258,15 +251,15 @@ public class TimetableEngineService {
                 request.freeDays(),
                 request.excludeFirstPeriod(),
                 completedCourseCodes,
-                request.generalRequiredCourses()
+                request.fixedCourses()
         );
     }
 
     private void validateGeneralRequiredSelections(TimetableCombinationRequestDto request) {
         List<GeneralRequiredCourseSelectionDto> selections =
-                request.generalRequiredCourses() == null
+                request.fixedCourses() == null
                         ? Collections.emptyList()
-                        : request.generalRequiredCourses();
+                        : request.fixedCourses();
 
         if (request.studentYear() == null || request.studentYear() != FIRST_YEAR) {
             return;
@@ -290,24 +283,6 @@ public class TimetableEngineService {
                 : courseName.replaceAll("\\s+", "");
 
         return REQUIRED_GENERAL_COURSE_NAME_ALIASES.getOrDefault(normalizedCourseName, normalizedCourseName);
-    }
-
-    private boolean areAllowedByConstraints(
-            CandidateContext fixedContext,
-            Map<Long, List<OfferingTime>> timesByOfferingId,
-            TimetableCombinationRequestDto request
-    ) {
-        if (fixedContext.offerings().isEmpty()) {
-            return true;
-        }
-
-        List<CourseOffering> allowedFixedOfferings = timetableConstraintFilter.apply(
-                fixedContext.offerings(),
-                timesByOfferingId,
-                request
-        );
-
-        return allowedFixedOfferings.size() == fixedContext.offerings().size();
     }
 
     // 사회봉사는 사회봉사가 아닌 다른 교양과목과 동등하게 "선택 가능한" 후보로 두면 백트래킹이 굳이

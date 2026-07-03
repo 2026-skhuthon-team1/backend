@@ -63,6 +63,6 @@ public record TimetableCombinationRequestDto(
                 arraySchema = @Schema(description = "1학년 교양필수 선택 강좌 목록"),
                 schema = @Schema(description = "교양필수 과목별 교수/시간 선택")
         )
-        List<@Valid GeneralRequiredCourseSelectionDto> generalRequiredCourses
+        List<@Valid GeneralRequiredCourseSelectionDto> fixedCourses
 ) {
 }

@@ -92,6 +92,7 @@ public class TimetableCombinationGenerator {
                 0,
                 new ArrayList<>(initialOfferings),
                 new ArrayList<>(initialTimes),
+                initialTimes.size(),
                 initialOfferings.stream()
                         .map(this::toSelectionKey)
                         .collect(Collectors.toSet()),
@@ -113,6 +114,7 @@ public class TimetableCombinationGenerator {
             int index,
             List<CourseOffering> selectedOfferings,
             List<OfferingTime> selectedTimes,
+            int fixedTimeCount,
             Set<String> selectedCourseCodes,
             int majorCredits,
             int generalCredits,
@@ -126,7 +128,9 @@ public class TimetableCombinationGenerator {
         if (majorCredits == request.targetMajorCredits()
                 && generalCredits == request.targetGeneralCredits()) {
 
-            if (!hasRequiredFreeDays(selectedTimes, request.freeDays())) {
+            // fixedCourses(고정 강좌)로 채워진 시간은 공강 요일 희망과 무관하게 항상 유지되어야 하므로,
+            // 자유 선택으로 채워진 부분(fixedTimeCount 이후)만 공강 요일 조건을 검사한다.
+            if (!hasRequiredFreeDays(selectedTimes.subList(fixedTimeCount, selectedTimes.size()), request.freeDays())) {
                 return;
             }
 
@@ -164,6 +168,7 @@ public class TimetableCombinationGenerator {
                 index + 1,
                 selectedOfferings,
                 selectedTimes,
+                fixedTimeCount,
                 selectedCourseCodes,
                 majorCredits,
                 generalCredits,
@@ -207,6 +212,7 @@ public class TimetableCombinationGenerator {
                 index + 1,
                 selectedOfferings,
                 selectedTimes,
+                fixedTimeCount,
                 selectedCourseCodes,
                 nextMajorCredits,
                 nextGeneralCredits,
