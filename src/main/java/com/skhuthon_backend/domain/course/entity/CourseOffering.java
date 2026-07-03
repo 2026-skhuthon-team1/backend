@@ -40,10 +40,10 @@ public class CourseOffering {
     private Course course;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false, length = 4)
+    @Column(name = "category", nullable = false, length = 20)
     private CourseCategory category;
 
-    @Column(name = "section_group", nullable = false, length = 60)
+    @Column(name = "section_group", length = 60)
     private String sectionGroup;
 
     @Column(name = "offered_year", length = 12)
@@ -61,7 +61,7 @@ public class CourseOffering {
     @Column(name = "major_restricted")
     private Boolean majorRestricted;
 
-    @Column(name = "note", length = 255)
+    @Column(name = "note", length = 500)
     private String note;
 
     @Builder.Default
