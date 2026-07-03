@@ -141,9 +141,12 @@ public class CourseCandidateProvider {
     }
 
     private List<CourseOffering> findMajorOfferings(List<String> studentMajors, Integer studentYear) {
+        boolean isSoftwareConvergenceTrackStudent =
+                studentMajors != null && studentMajors.stream().anyMatch(SOFTWARE_CONVERGENCE_TRACKS::contains);
         List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors);
         List<CourseOffering> filteredByYear = majorOfferings.stream()
-                .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
+                .filter(courseOffering -> isEligibleRegardlessOfYear(courseOffering, isSoftwareConvergenceTrackStudent)
+                        || isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
                 .collect(Collectors.toList());
 
         if (filteredByYear.size() != majorOfferings.size()) {
@@ -151,6 +154,14 @@ public class CourseCandidateProvider {
         }
 
         return filteredByYear;
+    }
+
+    // 트랙(소프트웨어공학전공/정보통신공학전공/컴퓨터공학전공) 학생에게 자격을 부여한 소프트웨어융합전공 과목은
+    // 원래 2~3학년용으로 offered_year가 설정돼 있어, 학년 필터를 그대로 적용하면 트랙 학생에게 열어준 의미가
+    // 사라진다. 이 경우에는 학년 제한을 적용하지 않는다.
+    private boolean isEligibleRegardlessOfYear(CourseOffering courseOffering, boolean isSoftwareConvergenceTrackStudent) {
+        return isSoftwareConvergenceTrackStudent
+                && SOFTWARE_CONVERGENCE_COMMON_MAJOR.equals(courseOffering.getSectionGroup());
     }
 
     private List<String> resolveEligibleMajors(List<String> studentMajors) {
