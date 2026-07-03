@@ -129,14 +129,28 @@ public class CourseCandidateProvider {
         }
 
         List<String> eligibleMajors = resolveEligibleMajors(studentMajors);
+        log.debug("전공 후보 조회 대상 sectionGroup 목록: {}", eligibleMajors);
 
-        return courseOfferingRepository.findByCategoryInAndSectionGroupIn(List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), eligibleMajors);
+        List<CourseOffering> majorOfferings = courseOfferingRepository.findByCategoryInAndSectionGroupIn(
+                List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), eligibleMajors);
+        Map<String, Long> countBySectionGroup = majorOfferings.stream()
+                .collect(Collectors.groupingBy(CourseOffering::getSectionGroup, Collectors.counting()));
+        log.debug("sectionGroup별 조회된 전공 강의 수: {}", countBySectionGroup);
+
+        return majorOfferings;
     }
 
     private List<CourseOffering> findMajorOfferings(List<String> studentMajors, Integer studentYear) {
-        return findMajorOfferings(studentMajors).stream()
+        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors);
+        List<CourseOffering> filteredByYear = majorOfferings.stream()
                 .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
                 .collect(Collectors.toList());
+
+        if (filteredByYear.size() != majorOfferings.size()) {
+            log.debug("학년({}) 필터링으로 전공 강의 수 변화: {}건 -> {}건", studentYear, majorOfferings.size(), filteredByYear.size());
+        }
+
+        return filteredByYear;
     }
 
     private List<String> resolveEligibleMajors(List<String> studentMajors) {
