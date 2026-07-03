@@ -12,6 +12,7 @@ import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.parser.TranscriptParserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TimetableEngineService {
@@ -80,7 +82,6 @@ public class TimetableEngineService {
             TimetableGenerateRequestDto request,
             MultipartFile transcript
     ) {
-
         Set<String> completedCourseCodes = transcriptParserService.parse(transcript);
 
         TimetableCombinationRequestDto combinationRequest =
@@ -96,6 +97,10 @@ public class TimetableEngineService {
 
         CandidateContext context =
                 courseCandidateProvider.findCandidates(combinationRequest);
+        if (context.offerings().isEmpty()) {
+            log.warn("조건에 맞는 후보 강의가 없음: majors={}, completedCourseCodes={}건",
+                    request.getStudentMajors(), completedCourseCodes.size());
+        }
 
         List<CourseOffering> filteredOfferings =
                 timetableConstraintFilter.apply(
@@ -103,6 +108,9 @@ public class TimetableEngineService {
                         context.timesByOfferingId(),
                         combinationRequest
                 );
+        if (filteredOfferings.isEmpty()) {
+            log.warn("제약조건 필터링 후 남은 강의가 없음: 후보 강의 수={}건", context.offerings().size());
+        }
 
         List<TimetableCombination> combinations =
                 timetableCombinationGenerator.generate(
@@ -110,6 +118,10 @@ public class TimetableEngineService {
                         context.timesByOfferingId(),
                         combinationRequest
                 );
+        if (combinations.isEmpty()) {
+            log.warn("생성된 시간표 조합이 없음: 필터링된 강의 수={}건", filteredOfferings.size());
+        }
+
         List<TimetableCombination> reducedCombinations =
                 timetableCandidateReducer.reduce(combinations);
 

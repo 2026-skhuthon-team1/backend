@@ -8,7 +8,7 @@ spring:
     hibernate:
       ddl-auto: none
 
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: false
@@ -17,3 +17,9 @@ spring:
 ai:
   service:
     base-url: ${AI_SERVICE_BASE_URL}
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    org.hibernate.orm.jdbc.bind: warn
+    com.skhuthon_backend: debug

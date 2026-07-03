@@ -35,10 +35,12 @@ public class TranscriptExcelParser {
             Map<String, Integer> headerIndexMap = createHeaderIndexMap(headerRow);
             Integer courseCodeColumn = headerIndexMap.get(COURSE_CODE_HEADER);
             if (courseCodeColumn == null) {
+                log.warn("'과목코드' 컬럼을 찾지 못함: headers={}", headerIndexMap.keySet());
                 throw new InvalidExcelFormatException("'과목코드' 컬럼을 찾을 수 없습니다.");
             }
             Integer courseNameColumn = headerIndexMap.get(COURSE_NAME_HEADER);
             if (courseNameColumn == null) {
+                log.warn("'과목명' 컬럼을 찾지 못함: headers={}", headerIndexMap.keySet());
                 throw new InvalidExcelFormatException("'과목명' 컬럼을 찾을 수 없습니다.");
             }
 
@@ -49,6 +51,7 @@ public class TranscriptExcelParser {
                     courseNameColumn
             );
         } catch (IOException e) {
+            log.warn("엑셀 파일 읽기 실패: filename={}", file.getOriginalFilename(), e);
             throw new InvalidExcelFormatException("엑셀 파일을 읽을 수 없습니다.");
         }
     }
@@ -103,6 +106,8 @@ public class TranscriptExcelParser {
         }
 
         if (completedChapelCount >= REQUIRED_CHAPEL_COMPLETION_COUNT) {
+            log.debug("채플 {}회 이상 이수 확인, 채플 과목 자동 이수 처리: codes={}",
+                    completedChapelCount, CHAPEL_COURSE_CODES);
             completedCourseCodes.addAll(CHAPEL_COURSE_CODES);
         }
 
@@ -130,11 +135,13 @@ public class TranscriptExcelParser {
 
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
+            log.warn("업로드된 성적표 파일이 없음");
             throw new InvalidExcelFormatException("업로드된 파일이 없습니다.");
         }
         String filename = file.getOriginalFilename();
         if (filename == null ||
                 !(filename.endsWith(".xlsx") || filename.endsWith(".xls"))) {
+            log.warn("허용되지 않는 파일 형식: filename={}", filename);
             throw new InvalidExcelFormatException("엑셀 파일만 업로드할 수 있습니다.");
         }
     }
