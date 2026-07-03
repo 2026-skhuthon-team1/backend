@@ -4,6 +4,7 @@ import com.skhuthon_backend.domain.ai.dto.AiRankingResponseDto;
 import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto;
 import com.skhuthon_backend.domain.course.dto.OfferingTimeResponseDto;
 import com.skhuthon_backend.domain.course.dto.RecommendedCourseDto;
+import com.skhuthon_backend.domain.course.dto.RecommendedCourseTimeDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto;
@@ -128,21 +129,36 @@ public class TimetableCombinationMapper {
     }
 
     private RecommendedCourseDto toRecommendedCourse(CourseOffering courseOffering, List<OfferingTime> times) {
+        List<OfferingTime> offeringTimes = filterTimesForOffering(courseOffering, times);
+
         return RecommendedCourseDto.builder()
                 .courseName(courseOffering.getCourse().getCourseName())
-                .room(findRoom(courseOffering, times))
+                .room(findRoom(offeringTimes))
                 .category(courseOffering.getCategory().getLabel())
                 .professor(courseOffering.getProfessor())
+                .credits(getCredits(courseOffering))
+                .times(toRecommendedCourseTimes(offeringTimes))
                 .build();
     }
 
-    private String findRoom(CourseOffering courseOffering, List<OfferingTime> times) {
+    private List<OfferingTime> filterTimesForOffering(CourseOffering courseOffering, List<OfferingTime> times) {
         return times.stream()
                 .filter(time -> time.getCourseOffering().getId().equals(courseOffering.getId()))
+                .collect(Collectors.toList());
+    }
+
+    private String findRoom(List<OfferingTime> offeringTimes) {
+        return offeringTimes.stream()
                 .map(OfferingTime::getRoom)
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private List<RecommendedCourseTimeDto> toRecommendedCourseTimes(List<OfferingTime> offeringTimes) {
+        return offeringTimes.stream()
+                .map(RecommendedCourseTimeDto::from)
+                .collect(Collectors.toList());
     }
 
     private int getCredits(CourseOffering courseOffering) {
