@@ -7,6 +7,7 @@ import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.DayOfWeek;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.stream.IntStream;
 //- 시간 충돌 검사
 //- 중복 과목코드 방지
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TimetableCombinationGenerator {
@@ -46,6 +48,28 @@ public class TimetableCombinationGenerator {
                 .toArray();
         int[] remainingGeneralCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.GENERAL);
 
+        if (log.isDebugEnabled()) {
+            candidates.forEach(candidate -> log.debug(
+                    "후보 강의: code={}, name={}, category={}, sectionGroup={}, offeredYear={}, credits={}, times=[{}]",
+                    candidate.getCourse().getCourseCode(),
+                    candidate.getCourse().getCourseName(),
+                    candidate.getCategory(),
+                    candidate.getSectionGroup(),
+                    candidate.getOfferedYear(),
+                    getCredits(candidate),
+                    summarizeTimes(timesByOfferingId.getOrDefault(candidate.getId(), Collections.emptyList()))
+            ));
+        }
+
+        if (remainingMajorCredits.length > 0 && remainingMajorCredits[0] < request.targetMajorCredits()) {
+            log.warn("후보 전공학점 합({})이 목표 전공학점({})보다 부족해 조합을 만들 수 없음",
+                    remainingMajorCredits[0], request.targetMajorCredits());
+        }
+        if (remainingGeneralCredits.length > 0 && remainingGeneralCredits[0] < request.targetGeneralCredits()) {
+            log.warn("후보 교양학점 합({})이 목표 교양학점({})보다 부족해 조합을 만들 수 없음",
+                    remainingGeneralCredits[0], request.targetGeneralCredits());
+        }
+
         backtrack(
                 candidates,
                 timesByOfferingId,
@@ -61,6 +85,13 @@ public class TimetableCombinationGenerator {
                 results,
                 signatures
         );
+
+        if (results.isEmpty()
+                && remainingMajorCredits.length > 0 && remainingMajorCredits[0] >= request.targetMajorCredits()
+                && remainingGeneralCredits.length > 0 && remainingGeneralCredits[0] >= request.targetGeneralCredits()) {
+            log.warn("학점 합은 충분하지만(전공={}, 교양={}) 시간 충돌 또는 공강요일({}) 제약으로 조합을 만들지 못함",
+                    remainingMajorCredits[0], remainingGeneralCredits[0], request.freeDays());
+        }
 
         return results;
     }
@@ -177,6 +208,12 @@ public class TimetableCombinationGenerator {
         selectedCourseCodes.remove(courseCode);
         selectedTimes.subList(selectedTimes.size() - candidateTimes.size(), selectedTimes.size()).clear();
         selectedOfferings.remove(selectedOfferings.size() - 1);
+    }
+
+    private String summarizeTimes(List<OfferingTime> times) {
+        return times.stream()
+                .map(time -> time.getDayOfWeek().getLabel() + " " + time.getStartTime() + "-" + time.getEndTime())
+                .collect(Collectors.joining(", "));
     }
 
     private int[] calculateRemainingCreditsByCategory(List<CourseOffering> candidates, CourseCategory category) {
