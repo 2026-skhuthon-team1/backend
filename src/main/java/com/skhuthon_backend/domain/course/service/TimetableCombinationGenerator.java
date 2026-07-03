@@ -23,6 +23,8 @@ import org.springframework.stereotype.Component;
 public class TimetableCombinationGenerator {
 
     private static final int MAX_COMBINATION_COUNT = 100;
+    private static final Set<String> CHAPEL_COURSE_CODES = Set.of("AK00113", "AK00114");
+    private static final String CHAPEL_SELECTION_KEY = "CHAPEL";
 
     private final TimeConflictChecker timeConflictChecker;
     private final TimetableFeatureExtractor timetableFeatureExtractor;
@@ -91,7 +93,7 @@ public class TimetableCombinationGenerator {
                 new ArrayList<>(initialOfferings),
                 new ArrayList<>(initialTimes),
                 initialOfferings.stream()
-                        .map(offering -> offering.getCourse().getCourseCode())
+                        .map(this::toSelectionKey)
                         .collect(Collectors.toSet()),
                 initialMajorCredits,
                 initialGeneralCredits,
@@ -150,6 +152,7 @@ public class TimetableCombinationGenerator {
 
         CourseOffering candidate = candidates.get(index);
         String courseCode = candidate.getCourse().getCourseCode();
+        String selectionKey = toSelectionKey(candidate);
         int credits = getCredits(candidate);
 
         backtrack(
@@ -168,7 +171,7 @@ public class TimetableCombinationGenerator {
                 signatures
         );
 
-        if (selectedCourseCodes.contains(courseCode)) {
+        if (selectedCourseCodes.contains(selectionKey)) {
             return;
         }
 
@@ -193,7 +196,7 @@ public class TimetableCombinationGenerator {
 
         selectedOfferings.add(candidate);
         selectedTimes.addAll(candidateTimes);
-        selectedCourseCodes.add(courseCode);
+        selectedCourseCodes.add(selectionKey);
 
         backtrack(
                 candidates,
@@ -211,9 +214,18 @@ public class TimetableCombinationGenerator {
                 signatures
         );
 
-        selectedCourseCodes.remove(courseCode);
+        selectedCourseCodes.remove(selectionKey);
         selectedTimes.subList(selectedTimes.size() - candidateTimes.size(), selectedTimes.size()).clear();
         selectedOfferings.remove(selectedOfferings.size() - 1);
+    }
+
+    private String toSelectionKey(CourseOffering courseOffering) {
+        String courseCode = courseOffering.getCourse().getCourseCode();
+        if (CHAPEL_COURSE_CODES.contains(courseCode)) {
+            return CHAPEL_SELECTION_KEY;
+        }
+
+        return courseCode;
     }
 
     private List<OfferingTime> collectTimes(
