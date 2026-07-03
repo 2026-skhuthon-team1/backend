@@ -17,7 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FastApiService {
 
-    private static final String RANK_PATH = "/api/rank";
+    private static final String RANK_PATH = "/recommend";
 
     private final AiTimetableMapper aiTimetableMapper;
     private final RestClient restClient;
