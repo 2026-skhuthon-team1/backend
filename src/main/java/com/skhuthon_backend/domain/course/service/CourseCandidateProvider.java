@@ -48,6 +48,29 @@ public class CourseCandidateProvider {
             "웹프로그래밍"
     );
 
+    // 선수필수: 과목명 -> 이수해야 하는 선수과목명 목록(전부 이수해야 함, AND 조건).
+    // completedCourseNames(성적표에서 파싱한 기이수 과목명)로만 판단하므로,
+    // 성적표 업로드 흐름이 아닌 다른 후보 조회 경로에서는 적용되지 않는다.
+    private static final Map<String, List<String>> PREREQUISITE_COURSE_NAMES = Map.ofEntries(
+            Map.entry("데이터분석입문", List.of("Python프로그래밍")),
+            Map.entry("C++프로그래밍", List.of("C프로그래밍")),
+            Map.entry("JSP프로그래밍", List.of("웹개발입문", "Java프로그래밍")),
+            Map.entry("백엔드프로그래밍", List.of("웹개발입문", "Java프로그래밍", "데이터베이스")),
+            Map.entry("웹디자인", List.of("웹개발입문")),
+            Map.entry("자료구조", List.of("Java프로그래밍")),
+            Map.entry("고급Java프로그래밍", List.of("Java프로그래밍")),
+            Map.entry("백엔드프레임워크", List.of("백엔드프로그래밍")),
+            Map.entry("알고리즘", List.of("자료구조")),
+            Map.entry("프론트엔드프로그래밍", List.of("웹개발입문", "Javascript프로그래밍")),
+            Map.entry("하이브리드앱프로그래밍", List.of("웹개발입문")),
+            Map.entry("Java네트워크프로그래밍", List.of("Java프로그래밍")),
+            Map.entry("프론트엔드프레임워크", List.of("프론트엔드프로그래밍")),
+            Map.entry("Node.js프로그래밍", List.of("Javascript프로그래밍")),
+            Map.entry("빅데이터", List.of("통계자료분석및실습")),
+            Map.entry("머신러닝", List.of("Python프로그래밍")),
+            Map.entry("코딩테스트지도", List.of("알고리즘"))
+    );
+
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
 
@@ -106,9 +129,31 @@ public class CourseCandidateProvider {
         List<CourseOffering> filteredOfferings = excludeSupersededCourses(candidateOfferings.stream()
                 .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
                 .filter(courseOffering -> !completedCourseNames.contains(courseOffering.getCourse().getCourseName()))
+                .filter(courseOffering -> hasCompletedPrerequisites(courseOffering, completedCourseNames))
                 .collect(Collectors.toList()));
 
         return new CandidateContext(filteredOfferings, findTimesByOfferingId(filteredOfferings));
+    }
+
+    // 선수필수: 요구되는 선수과목을 모두 이수하지 않았다면 후보에서 제외한다.
+    // completedCourseNames가 비어있으면(성적표 업로드 흐름이 아니면) 판단할 근거가 없으므로 걸러내지 않는다.
+    private boolean hasCompletedPrerequisites(CourseOffering courseOffering, Set<String> completedCourseNames) {
+        if (completedCourseNames.isEmpty()) {
+            return true;
+        }
+
+        List<String> requiredPrerequisites = PREREQUISITE_COURSE_NAMES.get(courseOffering.getCourse().getCourseName());
+        if (requiredPrerequisites == null) {
+            return true;
+        }
+
+        boolean allCompleted = completedCourseNames.containsAll(requiredPrerequisites);
+        if (!allCompleted) {
+            log.debug("선수과목 미이수로 후보에서 제외: course={}, requiredPrerequisites={}",
+                    courseOffering.getCourse().getCourseName(), requiredPrerequisites);
+        }
+
+        return allCompleted;
     }
 
     private List<CourseOffering> excludeSupersededCourses(List<CourseOffering> offerings) {
