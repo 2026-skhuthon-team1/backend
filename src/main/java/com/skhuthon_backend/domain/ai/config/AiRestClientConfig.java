@@ -10,7 +10,7 @@ import org.springframework.web.client.RestClient;
 public class AiRestClientConfig {
 
     private static final int CONNECT_TIMEOUT_MS = 3_000;
-    private static final int READ_TIMEOUT_MS = 10_000;
+    private static final int READ_TIMEOUT_MS = 60_000;
 
     @Bean
     public RestClient aiRestClient(@Value("${ai.service.base-url}") String baseUrl) {
