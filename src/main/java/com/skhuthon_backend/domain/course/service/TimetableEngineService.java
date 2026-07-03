@@ -1,8 +1,6 @@
 package com.skhuthon_backend.domain.course.service;
 
 import com.skhuthon_backend.domain.ai.dto.AiRankingResponseDto;
-import com.skhuthon_backend.domain.ai.dto.AiTimetableRequestDto;
-import com.skhuthon_backend.domain.ai.model.AiTimetableMapper;
 import com.skhuthon_backend.domain.ai.model.TimetableCandidateReducer;
 import com.skhuthon_backend.domain.ai.service.FastApiService;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
@@ -10,6 +8,7 @@ import com.skhuthon_backend.domain.course.dto.CourseOfferingCandidateResponseDto
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableGenerateRequestDto;
+import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.parser.TranscriptParserService;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,6 @@ public class TimetableEngineService {
     private final TimetableCombinationMapper timetableCombinationMapper;
     private final TranscriptParserService transcriptParserService;
     private final FastApiService fastApiService;
-    private final AiTimetableMapper aiTimetableMapper;
     private final TimetableCandidateReducer timetableCandidateReducer;
 
     @Transactional(readOnly = true)
@@ -63,8 +61,6 @@ public class TimetableEngineService {
         List<TimetableCombination> reducedCombinations =
                 timetableCandidateReducer.reduce(combinations);
 
-        List<AiRankingResponseDto> rankings = fastApiService.rank(reducedCombinations);
-
         return timetableCombinationMapper.toTimetableResponses(
                 reducedCombinations,
                 candidateContext.timesByOfferingId(),
@@ -80,26 +76,7 @@ public class TimetableEngineService {
     }
 
     @Transactional(readOnly = true)
-    public List<TimetableCombinationResponseDto> generateTimetable(
-            TimetableGenerateRequestDto request,
-            MultipartFile transcript
-    ) {
-        Set<String> completedCourseCodes = transcriptParserService.parse(transcript);
-        TimetableCombinationRequestDto combinationRequest =
-                new TimetableCombinationRequestDto(
-                        request.getStudentMajors(),
-                        request.getStudentYear(),
-                        request.getTargetMajorCredits(),
-                        request.getTargetGeneralCredits(),
-                        request.getFreeDays(),
-                        request.getExcludeFirstPeriod(),
-                        completedCourseCodes.stream().toList()
-                );
-        return generateCombinations(combinationRequest);
-    }
-
-    @Transactional(readOnly = true)
-    public AiTimetableRequestDto generateAiRequest(
+    public List<TimetableRecommendationResponseDto> generateRecommendations(
             TimetableGenerateRequestDto request,
             MultipartFile transcript
     ) {
@@ -135,7 +112,11 @@ public class TimetableEngineService {
                 );
         List<TimetableCombination> reducedCombinations =
                 timetableCandidateReducer.reduce(combinations);
-        return aiTimetableMapper.toRequest(
+
+        List<AiRankingResponseDto> rankings = fastApiService.rank(reducedCombinations);
+
+        return timetableCombinationMapper.toRecommendationResponses(
+                rankings,
                 reducedCombinations
         );
     }

@@ -2,10 +2,14 @@ package com.skhuthon_backend.domain.ai.service;
 
 import com.skhuthon_backend.domain.ai.dto.AiRankingResponseDto;
 import com.skhuthon_backend.domain.ai.dto.AiTimetableRequestDto;
+import com.skhuthon_backend.domain.ai.exception.AiRankingException;
 import com.skhuthon_backend.domain.ai.model.AiTimetableMapper;
 import com.skhuthon_backend.domain.course.service.TimetableCombination;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 
@@ -13,20 +17,29 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FastApiService {
 
+    private static final String RANK_PATH = "/recommend";
+
     private final AiTimetableMapper aiTimetableMapper;
+    private final RestClient restClient;
 
     public List<AiRankingResponseDto> rank(
             List<TimetableCombination> combinations
     ) {
 
-        // AI 요청 DTO 생성
         AiTimetableRequestDto request =
                 aiTimetableMapper.toRequest(
                         combinations
                 );
 
-        // TODO FastAPI 호출
-
-        return List.of();
+        try {
+            return restClient.post()
+                    .uri(RANK_PATH)
+                    .body(request)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<List<AiRankingResponseDto>>() {
+                    });
+        } catch (RestClientException e) {
+            throw new AiRankingException("AI 순위 서버 호출에 실패했습니다.", e);
+        }
     }
 }
