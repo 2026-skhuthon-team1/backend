@@ -1,16 +1,13 @@
 package com.skhuthon_backend.domain.course.service;
 
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
+import com.skhuthon_backend.domain.course.dto.GeneralRequiredCourseSelectionDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -21,36 +18,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-//- 전공/교양 후보 조회
-//- 학년 조건 적용
-//- 기이수 과목 제외
-//- OfferingTime 조회
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CourseCandidateProvider {
 
-    private static final List<String> SELECTABLE_MAJOR_COURSE_TYPES = List.of("전공필수", "전공선택", "교양");
+    private static final Set<CourseCategory> SELECTABLE_MAJOR_COURSE_TYPES = Set.of(
+            CourseCategory.MAJOR_REQUIRED,
+            CourseCategory.MAJOR_ELECTIVE
+    );
 
-    // 소프트웨어융합학부(IT융합자율학부) 4학년 트랙 - 2~3학년은 공통 전공으로 개설되므로
-    // 트랙을 선언한 학생도 학부 공통 전공 과목을 자격 대상에 포함해야 함
     private static final Set<String> SOFTWARE_CONVERGENCE_TRACKS = Set.of(
-            "소프트웨어공학전공", "정보통신공학전공", "컴퓨터공학전공"
+            "소프트웨어공학전공",
+            "정보통신공학전공",
+            "컴퓨터공학전공"
     );
     private static final String SOFTWARE_CONVERGENCE_COMMON_MAJOR = "소프트웨어융합전공";
 
-    // 교육과정 개편으로 과목명이 바뀌면서 구 명칭 과목이 DB에 남아있는 경우,
-    // 신 명칭 과목과 중복 노출되지 않도록 구 명칭 과목은 후보에서 항상 제외한다.
     private static final Set<String> SUPERSEDED_COURSE_NAMES = Set.of(
             "프론트엔드개발",
             "웹프로그래밍"
     );
 
-    // 선수필수: 과목명 -> 이수해야 하는 선수과목명 목록(전부 이수해야 함, AND 조건).
-    // completedCourseNames(성적표에서 파싱한 기이수 과목명)로만 판단하므로,
-    // 성적표 업로드 흐름이 아닌 다른 후보 조회 경로에서는 적용되지 않는다.
     private static final Map<String, List<String>> PREREQUISITE_COURSE_NAMES = Map.ofEntries(
             Map.entry("데이터분석입문", List.of("Python프로그래밍")),
             Map.entry("C++프로그래밍", List.of("C프로그래밍")),
@@ -63,12 +56,52 @@ public class CourseCandidateProvider {
             Map.entry("알고리즘", List.of("자료구조")),
             Map.entry("프론트엔드프로그래밍", List.of("웹개발입문", "Javascript프로그래밍")),
             Map.entry("하이브리드앱프로그래밍", List.of("웹개발입문")),
-            Map.entry("Java네트워크프로그래밍", List.of("Java프로그래밍")),
+            Map.entry("네트워크프로그래밍", List.of("Java프로그래밍")),
             Map.entry("프론트엔드프레임워크", List.of("프론트엔드프로그래밍")),
             Map.entry("Node.js프로그래밍", List.of("Javascript프로그래밍")),
-            Map.entry("빅데이터", List.of("통계자료분석및실습")),
             Map.entry("머신러닝", List.of("Python프로그래밍")),
             Map.entry("코딩테스트지도", List.of("알고리즘"))
+    );
+
+    private static final Map<String, String> GENERAL_REQUIRED_COURSE_NAME_ALIASES = Map.of(
+            "데이터리터러시", "디지털리터러시"
+    );
+
+    private static final Map<String, String> MAJOR_EXPLORATION_GROUP_ALIASES = Map.ofEntries(
+            Map.entry("인문융합콘텐츠학부", "인문융합콘텐츠학부(인문융합자율학부)"),
+            Map.entry("인문융합자율학부", "인문융합콘텐츠학부(인문융합자율학부)"),
+            Map.entry("영어학전공", "인문융합콘텐츠학부(인문융합자율학부)"),
+            Map.entry("일어일본학전공", "인문융합콘텐츠학부(인문융합자율학부)"),
+            Map.entry("중어중국학전공", "인문융합콘텐츠학부(인문융합자율학부)"),
+            Map.entry("종교와신학(기독교문화)전공", "인문융합콘텐츠학부(인문융합자율학부)"),
+            Map.entry("사회융합학부", "사회융합학부(사회융합자율학부)"),
+            Map.entry("사회융합자율학부", "사회융합학부(사회융합자율학부)"),
+            Map.entry("사회복지학전공", "사회융합학부(사회융합자율학부)"),
+            Map.entry("사회학전공", "사회융합학부(사회융합자율학부)"),
+            Map.entry("경제학전공", "사회융합학부(사회융합자율학부)"),
+            Map.entry("정치외교학전공", "사회융합학부(사회융합자율학부)"),
+            Map.entry("경영학부", "경영학부"),
+            Map.entry("경영학전공(경영학부)", "경영학부"),
+            Map.entry("경영학전공", "경영학부"),
+            Map.entry("미디어콘텐츠융합학부", "미디어콘텐츠융합학부(미디어콘텐츠융합자율학부)"),
+            Map.entry("미디어콘텐츠융합자율학부", "미디어콘텐츠융합학부(미디어콘텐츠융합자율학부)"),
+            Map.entry("신문방송학전공", "미디어콘텐츠융합학부(미디어콘텐츠융합자율학부)"),
+            Map.entry("디지털콘텐츠전공", "미디어콘텐츠융합학부(미디어콘텐츠융합자율학부)"),
+            Map.entry("영상콘텐츠전공", "미디어콘텐츠융합학부(미디어콘텐츠융합자율학부)"),
+            Map.entry("소프트웨어융합학부", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("IT융합자율학부", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("소프트웨어융합전공", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("컴퓨터공학전공", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("소프트웨어공학전공", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("정보통신공학전공", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("인공지능전공", "소프트웨어융합학부(IT융합자율학부)"),
+            Map.entry("미래융합학부", "미래융합학부"),
+            Map.entry("미래인공지능전공", "미래융합학부"),
+            Map.entry("빅데이터응용전공", "미래융합학부")
+    );
+    private static final Set<String> FREE_MAJOR_GROUP_NAMES = Set.of(
+            "자유전공학부",
+            "자유전공"
     );
 
     private final CourseOfferingRepository courseOfferingRepository;
@@ -87,8 +120,6 @@ public class CourseCandidateProvider {
         return findCandidates(request, Collections.emptySet());
     }
 
-    // completedCourseNames: 성적표(엑셀)에서 파싱한 기이수 과목명. course_code가 다르더라도
-    // 이름이 완전히 같은 후보 과목은 이미 이수한 것으로 간주해 제외한다.
     public CandidateContext findCandidates(TimetableCombinationRequestDto request, Set<String> completedCourseNames) {
         return findCandidates(
                 request.studentMajors(),
@@ -96,6 +127,35 @@ public class CourseCandidateProvider {
                 request.completedCourseCodes(),
                 completedCourseNames
         );
+    }
+
+    public CandidateContext findSelectedGeneralRequiredOfferings(
+            List<GeneralRequiredCourseSelectionDto> selections
+    ) {
+        if (selections == null || selections.isEmpty()) {
+            return new CandidateContext(Collections.emptyList(), Collections.emptyMap());
+        }
+
+        List<CourseOffering> generalRequiredOfferings =
+                courseOfferingRepository.findByCategory(CourseCategory.GENERAL_REQUIRED);
+        Map<Long, List<OfferingTime>> timesByOfferingId = findTimesByOfferingId(generalRequiredOfferings);
+
+        List<CourseOffering> selectedOfferings = selections.stream()
+                .map(selection -> findMatchingGeneralRequiredOffering(
+                        selection,
+                        generalRequiredOfferings,
+                        timesByOfferingId
+                ))
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Long, List<OfferingTime>> selectedTimesByOfferingId = selectedOfferings.stream()
+                .collect(Collectors.toMap(
+                        CourseOffering::getId,
+                        offering -> timesByOfferingId.getOrDefault(offering.getId(), Collections.emptyList())
+                ));
+
+        return new CandidateContext(selectedOfferings, selectedTimesByOfferingId);
     }
 
     public CandidateContext findAllOfferings() {
@@ -106,7 +166,7 @@ public class CourseCandidateProvider {
 
     public CandidateContext findSelectableOfferings(List<String> studentMajors) {
         List<CourseOffering> selectableMajorOfferings = findMajorOfferings(studentMajors).stream()
-                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCategory().getLabel()))
+                .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCategory()))
                 .collect(Collectors.toList());
         List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(CourseCategory.GENERAL);
         List<CourseOffering> selectableOfferings =
@@ -115,13 +175,23 @@ public class CourseCandidateProvider {
         return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
     }
 
+    public CandidateContext findGeneralRequiredOfferings() {
+        List<CourseOffering> generalRequiredOfferings =
+                courseOfferingRepository.findByCategory(CourseCategory.GENERAL_REQUIRED);
+
+        return new CandidateContext(generalRequiredOfferings, findTimesByOfferingId(generalRequiredOfferings));
+    }
+
     private CandidateContext findCandidates(
             List<String> studentMajors,
             Integer studentYear,
             List<String> completedCourseCodes,
             Set<String> completedCourseNames
     ) {
-        List<CourseOffering> majorOfferings = findMajorOfferings(studentMajors, studentYear);
+        List<CourseOffering> majorOfferings = mergeWithoutDuplicate(
+                findMajorOfferings(studentMajors, studentYear),
+                findMajorExplorationOfferings(studentMajors, studentYear)
+        );
         List<CourseOffering> generalOfferings = findGeneralOfferings(studentYear);
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
         Set<String> completedCodeSet = toSet(completedCourseCodes);
@@ -135,8 +205,6 @@ public class CourseCandidateProvider {
         return new CandidateContext(filteredOfferings, findTimesByOfferingId(filteredOfferings));
     }
 
-    // 선수필수: 요구되는 선수과목을 모두 이수하지 않았다면 후보에서 제외한다.
-    // completedCourseNames가 비어있으면(성적표 업로드 흐름이 아니면) 판단할 근거가 없으므로 걸러내지 않는다.
     private boolean hasCompletedPrerequisites(CourseOffering courseOffering, Set<String> completedCourseNames) {
         if (completedCourseNames.isEmpty()) {
             return true;
@@ -149,23 +217,20 @@ public class CourseCandidateProvider {
 
         boolean allCompleted = completedCourseNames.containsAll(requiredPrerequisites);
         if (!allCompleted) {
-            log.debug("선수과목 미이수로 후보에서 제외: course={}, requiredPrerequisites={}",
-                    courseOffering.getCourse().getCourseName(), requiredPrerequisites);
+            log.debug(
+                    "선수과목 미이수로 후보에서 제외: course={}, requiredPrerequisites={}",
+                    courseOffering.getCourse().getCourseName(),
+                    requiredPrerequisites
+            );
         }
 
         return allCompleted;
     }
 
     private List<CourseOffering> excludeSupersededCourses(List<CourseOffering> offerings) {
-        List<CourseOffering> filteredOfferings = offerings.stream()
+        return offerings.stream()
                 .filter(courseOffering -> !SUPERSEDED_COURSE_NAMES.contains(courseOffering.getCourse().getCourseName()))
                 .collect(Collectors.toList());
-
-        if (filteredOfferings.size() != offerings.size()) {
-            log.debug("개편으로 대체된 구 명칭 과목 제외: 제외 전={}건, 제외 후={}건", offerings.size(), filteredOfferings.size());
-        }
-
-        return filteredOfferings;
     }
 
     private List<CourseOffering> findMajorOfferings(List<String> studentMajors) {
@@ -174,10 +239,10 @@ public class CourseCandidateProvider {
         }
 
         List<String> eligibleMajors = resolveEligibleMajors(studentMajors);
-        log.debug("전공 후보 조회 대상 sectionGroup 목록: {}", eligibleMajors);
-
         List<CourseOffering> majorOfferings = courseOfferingRepository.findByCategoryInAndSectionGroupIn(
-                List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED), eligibleMajors);
+                List.of(CourseCategory.MAJOR_ELECTIVE, CourseCategory.MAJOR_REQUIRED),
+                eligibleMajors
+        );
         Map<String, Long> countBySectionGroup = majorOfferings.stream()
                 .collect(Collectors.groupingBy(CourseOffering::getSectionGroup, Collectors.counting()));
         log.debug("sectionGroup별 조회된 전공 강의 수: {}", countBySectionGroup);
@@ -195,16 +260,61 @@ public class CourseCandidateProvider {
                 .collect(Collectors.toList());
 
         if (filteredByYear.size() != majorOfferings.size()) {
-            log.debug("학년({}) 필터링으로 전공 강의 수 변화: {}건 -> {}건", studentYear, majorOfferings.size(), filteredByYear.size());
+            log.debug(
+                    "학년({}) 필터링으로 전공 강의 수 변경: {}건 -> {}건",
+                    studentYear,
+                    majorOfferings.size(),
+                    filteredByYear.size()
+            );
         }
 
         return filteredByYear;
     }
 
-    // 트랙(소프트웨어공학전공/정보통신공학전공/컴퓨터공학전공) 학생에게 자격을 부여한 소프트웨어융합전공 과목은
-    // 원래 2~3학년용으로 offered_year가 설정돼 있어, 학년 필터를 그대로 적용하면 트랙 학생에게 열어준 의미가
-    // 사라진다. 이 경우에는 학년 제한을 적용하지 않는다.
-    private boolean isEligibleRegardlessOfYear(CourseOffering courseOffering, boolean isSoftwareConvergenceTrackStudent) {
+    private List<CourseOffering> findMajorExplorationOfferings(List<String> studentMajors, Integer studentYear) {
+        if (studentYear == null || studentYear != 1) {
+            return Collections.emptyList();
+        }
+
+        Set<String> eligibleSectionGroups = resolveEligibleMajorExplorationGroups(studentMajors);
+        boolean freeMajorStudent = isFreeMajorStudent(studentMajors);
+        if (!freeMajorStudent && eligibleSectionGroups.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return courseOfferingRepository.findByCategory(CourseCategory.MAJOR_EXPLORATION).stream()
+                .filter(courseOffering -> freeMajorStudent
+                        || eligibleSectionGroups.contains(courseOffering.getSectionGroup()))
+                .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
+                .collect(Collectors.toList());
+    }
+
+    private boolean isFreeMajorStudent(List<String> studentMajors) {
+        if (studentMajors == null || studentMajors.isEmpty()) {
+            return false;
+        }
+
+        return studentMajors.stream()
+                .map(this::normalizeMajorName)
+                .anyMatch(FREE_MAJOR_GROUP_NAMES::contains);
+    }
+
+    private Set<String> resolveEligibleMajorExplorationGroups(List<String> studentMajors) {
+        if (studentMajors == null || studentMajors.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        return studentMajors.stream()
+                .map(this::normalizeMajorName)
+                .map(MAJOR_EXPLORATION_GROUP_ALIASES::get)
+                .filter(group -> group != null && !group.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private boolean isEligibleRegardlessOfYear(
+            CourseOffering courseOffering,
+            boolean isSoftwareConvergenceTrackStudent
+    ) {
         return isSoftwareConvergenceTrackStudent
                 && SOFTWARE_CONVERGENCE_COMMON_MAJOR.equals(courseOffering.getSectionGroup());
     }
@@ -233,9 +343,10 @@ public class CourseCandidateProvider {
         return isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear);
     }
 
-    // offered_year는 '2.3.4', '23,4', '2,3,4,' 등 오타가 섞여 있으므로 1~4 숫자만 추출해 매칭한다.
-    // '전체'/빈값이거나 숫자를 하나도 추출하지 못하면 과도한 차단을 막기 위해 전 학년에게 노출한다.
     private boolean isOfferedForStudentYear(String offeredYear, Integer studentYear) {
+        if (studentYear == null) {
+            return true;
+        }
         if (offeredYear == null || offeredYear.isBlank() || offeredYear.contains("전체")) {
             return true;
         }
@@ -270,6 +381,79 @@ public class CourseCandidateProvider {
         secondOfferings.forEach(courseOffering -> offeringsById.put(courseOffering.getId(), courseOffering));
 
         return new ArrayList<>(offeringsById.values());
+    }
+
+    private CourseOffering findMatchingGeneralRequiredOffering(
+            GeneralRequiredCourseSelectionDto selection,
+            List<CourseOffering> offerings,
+            Map<Long, List<OfferingTime>> timesByOfferingId
+    ) {
+        return offerings.stream()
+                .filter(offering -> matchesCourseName(offering, selection.courseName()))
+                .filter(offering -> matchesProfessor(offering, selection.professor()))
+                .filter(offering -> hasMatchingTime(
+                        timesByOfferingId.getOrDefault(offering.getId(), Collections.emptyList()),
+                        selection
+                ))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "일치하는 교양필수 강좌를 찾을 수 없습니다: courseName=%s, professor=%s, day=%s, time=%s-%s"
+                                .formatted(
+                                        selection.courseName(),
+                                        selection.professor(),
+                                        selection.dayOfWeek(),
+                                        selection.startTime(),
+                                        selection.endTime()
+                                )
+                ));
+    }
+
+    private boolean matchesCourseName(CourseOffering offering, String requestedCourseName) {
+        String normalizedRequestedName = normalizeCourseName(requestedCourseName);
+        String canonicalRequestedName = GENERAL_REQUIRED_COURSE_NAME_ALIASES.getOrDefault(
+                normalizedRequestedName,
+                normalizedRequestedName
+        );
+
+        return normalizeCourseName(offering.getCourse().getCourseName()).equals(canonicalRequestedName);
+    }
+
+    private String normalizeCourseName(String courseName) {
+        if (courseName == null) {
+            return "";
+        }
+
+        return courseName.replaceAll("\\s+", "");
+    }
+
+    private String normalizeMajorName(String majorName) {
+        if (majorName == null) {
+            return "";
+        }
+
+        return majorName.replaceAll("\\s+", "");
+    }
+
+    private boolean matchesProfessor(CourseOffering offering, String requestedProfessor) {
+        return normalizeProfessor(offering.getProfessor()).equals(normalizeProfessor(requestedProfessor));
+    }
+
+    private String normalizeProfessor(String professor) {
+        if (professor == null) {
+            return "";
+        }
+
+        return professor.replaceAll("\\s+", "");
+    }
+
+    private boolean hasMatchingTime(
+            List<OfferingTime> times,
+            GeneralRequiredCourseSelectionDto selection
+    ) {
+        return times.stream()
+                .anyMatch(time -> time.getDayOfWeek() == selection.dayOfWeek()
+                        && time.getStartTime().equals(selection.startTime())
+                        && time.getEndTime().equals(selection.endTime()));
     }
 
     private Set<String> toSet(Collection<String> values) {

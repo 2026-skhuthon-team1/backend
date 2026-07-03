@@ -6,10 +6,6 @@ import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.DayOfWeek;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -17,12 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-//- DFS / 백트래킹
-//- 학점 합 검사
-//- 시간 충돌 검사
-//- 중복 과목코드 방지
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
@@ -39,59 +32,72 @@ public class TimetableCombinationGenerator {
             Map<Long, List<OfferingTime>> timesByOfferingId,
             TimetableCombinationRequestDto request
     ) {
+        return generate(candidates, timesByOfferingId, request, Collections.emptyList());
+    }
+
+    public List<TimetableCombination> generate(
+            List<CourseOffering> candidates,
+            Map<Long, List<OfferingTime>> timesByOfferingId,
+            TimetableCombinationRequestDto request,
+            List<CourseOffering> fixedOfferings
+    ) {
+        List<CourseOffering> initialOfferings =
+                fixedOfferings == null ? Collections.emptyList() : fixedOfferings;
+        Set<Long> fixedOfferingIds = initialOfferings.stream()
+                .map(CourseOffering::getId)
+                .collect(Collectors.toSet());
+        List<CourseOffering> selectableCandidates = candidates.stream()
+                .filter(candidate -> !fixedOfferingIds.contains(candidate.getId()))
+                .collect(Collectors.toList());
+        List<OfferingTime> initialTimes = collectTimes(initialOfferings, timesByOfferingId);
+
+        if (hasInternalConflict(initialTimes)) {
+            log.warn("선택된 고정 강좌끼리 시간이 충돌하여 시간표를 생성할 수 없음");
+            return Collections.emptyList();
+        }
+
+        int initialMajorCredits = calculateMajorCredits(initialOfferings);
+        int initialGeneralCredits = calculateGeneralCredits(initialOfferings);
+        int[] remainingMajorCredits = calculateRemainingMajorCredits(selectableCandidates);
+        int[] remainingGeneralCredits = calculateRemainingGeneralCredits(selectableCandidates);
+
+        if (remainingMajorCredits.length > 0
+                && initialMajorCredits + remainingMajorCredits[0] < request.targetMajorCredits()) {
+            log.warn(
+                    "후보 전공학점 합({})이 목표 전공학점({})보다 부족해 조합을 만들 수 없음",
+                    initialMajorCredits + remainingMajorCredits[0],
+                    request.targetMajorCredits()
+            );
+        }
+        if (remainingGeneralCredits.length > 0
+                && initialGeneralCredits + remainingGeneralCredits[0] < request.targetGeneralCredits()) {
+            log.warn(
+                    "후보 교양학점 합({})이 목표 교양학점({})보다 부족해 조합을 만들 수 없음",
+                    initialGeneralCredits + remainingGeneralCredits[0],
+                    request.targetGeneralCredits()
+            );
+        }
+
         List<TimetableCombination> results = new ArrayList<>();
         Set<String> signatures = new HashSet<>();
-        int[] remainingElectiveCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_ELECTIVE);
-        int[] remainingRequiredCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.MAJOR_REQUIRED);
-        int[] remainingMajorCredits = IntStream.range(0, remainingElectiveCredits.length)
-                .map(index -> remainingElectiveCredits[index] + remainingRequiredCredits[index])
-                .toArray();
-        int[] remainingGeneralCredits = calculateRemainingCreditsByCategory(candidates, CourseCategory.GENERAL);
-
-        if (log.isDebugEnabled()) {
-            candidates.forEach(candidate -> log.debug(
-                    "후보 강의: code={}, name={}, category={}, sectionGroup={}, offeredYear={}, credits={}, times=[{}]",
-                    candidate.getCourse().getCourseCode(),
-                    candidate.getCourse().getCourseName(),
-                    candidate.getCategory(),
-                    candidate.getSectionGroup(),
-                    candidate.getOfferedYear(),
-                    getCredits(candidate),
-                    summarizeTimes(timesByOfferingId.getOrDefault(candidate.getId(), Collections.emptyList()))
-            ));
-        }
-
-        if (remainingMajorCredits.length > 0 && remainingMajorCredits[0] < request.targetMajorCredits()) {
-            log.warn("후보 전공학점 합({})이 목표 전공학점({})보다 부족해 조합을 만들 수 없음",
-                    remainingMajorCredits[0], request.targetMajorCredits());
-        }
-        if (remainingGeneralCredits.length > 0 && remainingGeneralCredits[0] < request.targetGeneralCredits()) {
-            log.warn("후보 교양학점 합({})이 목표 교양학점({})보다 부족해 조합을 만들 수 없음",
-                    remainingGeneralCredits[0], request.targetGeneralCredits());
-        }
 
         backtrack(
-                candidates,
+                selectableCandidates,
                 timesByOfferingId,
                 request,
                 remainingMajorCredits,
                 remainingGeneralCredits,
                 0,
-                new ArrayList<>(),
-                new ArrayList<>(),
-                new HashSet<>(),
-                0,
-                0,
+                new ArrayList<>(initialOfferings),
+                new ArrayList<>(initialTimes),
+                initialOfferings.stream()
+                        .map(offering -> offering.getCourse().getCourseCode())
+                        .collect(Collectors.toSet()),
+                initialMajorCredits,
+                initialGeneralCredits,
                 results,
                 signatures
         );
-
-        if (results.isEmpty()
-                && remainingMajorCredits.length > 0 && remainingMajorCredits[0] >= request.targetMajorCredits()
-                && remainingGeneralCredits.length > 0 && remainingGeneralCredits[0] >= request.targetGeneralCredits()) {
-            log.warn("학점 합은 충분하지만(전공={}, 교양={}) 시간 충돌 또는 공강요일({}) 제약으로 조합을 만들지 못함",
-                    remainingMajorCredits[0], remainingGeneralCredits[0], request.freeDays());
-        }
 
         return results;
     }
@@ -169,9 +175,9 @@ public class TimetableCombinationGenerator {
         int nextMajorCredits = majorCredits;
         int nextGeneralCredits = generalCredits;
 
-        if (candidate.getCategory() == CourseCategory.MAJOR_ELECTIVE || candidate.getCategory() == CourseCategory.MAJOR_REQUIRED) {
+        if (isMajorCategory(candidate.getCategory())) {
             nextMajorCredits += credits;
-        } else if (candidate.getCategory() == CourseCategory.GENERAL) {
+        } else if (isGeneralCategory(candidate.getCategory())) {
             nextGeneralCredits += credits;
         }
 
@@ -210,22 +216,77 @@ public class TimetableCombinationGenerator {
         selectedOfferings.remove(selectedOfferings.size() - 1);
     }
 
-    private String summarizeTimes(List<OfferingTime> times) {
-        return times.stream()
-                .map(time -> time.getDayOfWeek().getLabel() + " " + time.getStartTime() + "-" + time.getEndTime())
-                .collect(Collectors.joining(", "));
+    private List<OfferingTime> collectTimes(
+            List<CourseOffering> offerings,
+            Map<Long, List<OfferingTime>> timesByOfferingId
+    ) {
+        return offerings.stream()
+                .flatMap(offering -> timesByOfferingId.getOrDefault(
+                        offering.getId(),
+                        Collections.emptyList()
+                ).stream())
+                .collect(Collectors.toList());
     }
 
-    private int[] calculateRemainingCreditsByCategory(List<CourseOffering> candidates, CourseCategory category) {
+    private boolean hasInternalConflict(List<OfferingTime> times) {
+        for (int i = 0; i < times.size(); i++) {
+            for (int j = i + 1; j < times.size(); j++) {
+                if (timeConflictChecker.hasConflict(List.of(times.get(i)), List.of(times.get(j)))) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private int[] calculateRemainingMajorCredits(List<CourseOffering> candidates) {
         int[] remainingCredits = new int[candidates.size() + 1];
 
         for (int index = candidates.size() - 1; index >= 0; index--) {
             CourseOffering candidate = candidates.get(index);
-            int additionalCredits = candidate.getCategory() == category ? getCredits(candidate) : 0;
+            int additionalCredits = isMajorCategory(candidate.getCategory()) ? getCredits(candidate) : 0;
             remainingCredits[index] = remainingCredits[index + 1] + additionalCredits;
         }
 
         return remainingCredits;
+    }
+
+    private int[] calculateRemainingGeneralCredits(List<CourseOffering> candidates) {
+        int[] remainingCredits = new int[candidates.size() + 1];
+
+        for (int index = candidates.size() - 1; index >= 0; index--) {
+            CourseOffering candidate = candidates.get(index);
+            int additionalCredits = isGeneralCategory(candidate.getCategory()) ? getCredits(candidate) : 0;
+            remainingCredits[index] = remainingCredits[index + 1] + additionalCredits;
+        }
+
+        return remainingCredits;
+    }
+
+    private int calculateMajorCredits(List<CourseOffering> offerings) {
+        return offerings.stream()
+                .filter(offering -> isMajorCategory(offering.getCategory()))
+                .mapToInt(this::getCredits)
+                .sum();
+    }
+
+    private int calculateGeneralCredits(List<CourseOffering> offerings) {
+        return offerings.stream()
+                .filter(offering -> isGeneralCategory(offering.getCategory()))
+                .mapToInt(this::getCredits)
+                .sum();
+    }
+
+    private boolean isMajorCategory(CourseCategory category) {
+        return category == CourseCategory.MAJOR_ELECTIVE
+                || category == CourseCategory.MAJOR_REQUIRED
+                || category == CourseCategory.MAJOR_EXPLORATION;
+    }
+
+    private boolean isGeneralCategory(CourseCategory category) {
+        return category == CourseCategory.GENERAL
+                || category == CourseCategory.GENERAL_REQUIRED;
     }
 
     private int getCredits(CourseOffering courseOffering) {
