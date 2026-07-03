@@ -21,6 +21,10 @@ import java.util.Set;
 public class TranscriptExcelParser {
 
     private static final String COURSE_CODE_HEADER = "과목코드";
+    private static final String COURSE_NAME_HEADER = "과목명";
+    private static final String CHAPEL_KEYWORD = "채플";
+    private static final Set<String> CHAPEL_COURSE_CODES = Set.of("AK00113", "AK00114");
+    private static final int REQUIRED_CHAPEL_COMPLETION_COUNT = 2;
 
     public Set<String> parse(MultipartFile file) {
 
@@ -33,11 +37,16 @@ public class TranscriptExcelParser {
             if (courseCodeColumn == null) {
                 throw new InvalidExcelFormatException("'과목코드' 컬럼을 찾을 수 없습니다.");
             }
+            Integer courseNameColumn = headerIndexMap.get(COURSE_NAME_HEADER);
+            if (courseNameColumn == null) {
+                throw new InvalidExcelFormatException("'과목명' 컬럼을 찾을 수 없습니다.");
+            }
 
             return parseCompletedCourseCodes(
                     sheet,
                     headerRow.getRowNum() + 1,
-                    courseCodeColumn
+                    courseCodeColumn,
+                    courseNameColumn
             );
         } catch (IOException e) {
             throw new InvalidExcelFormatException("엑셀 파일을 읽을 수 없습니다.");
@@ -69,30 +78,42 @@ public class TranscriptExcelParser {
     private Set<String> parseCompletedCourseCodes(
             Sheet sheet,
             int startRow,
-            int courseCodeColumn
+            int courseCodeColumn,
+            int courseNameColumn
     ) {
         Set<String> completedCourseCodes = new HashSet<>();
+        int completedChapelCount = 0;
+
         for (int i = startRow; i <= sheet.getLastRowNum(); i++) {
             Row row = sheet.getRow(i);
             if (row == null) {
                 continue;
             }
 
-            Cell cell = row.getCell(courseCodeColumn);
-            if (cell == null) {
-                continue;
-            }
-            String courseCode = getCellValue(cell);
-            if (courseCode.isBlank()) {
-                continue;
+            String courseCode = getCellValue(row.getCell(courseCodeColumn));
+            String courseName = getCellValue(row.getCell(courseNameColumn));
+
+            if (!courseCode.isBlank()) {
+                completedCourseCodes.add(courseCode);
             }
 
-            completedCourseCodes.add(courseCode);
+            if (courseName.contains(CHAPEL_KEYWORD)) {
+                completedChapelCount++;
+            }
         }
+
+        if (completedChapelCount >= REQUIRED_CHAPEL_COMPLETION_COUNT) {
+            completedCourseCodes.addAll(CHAPEL_COURSE_CODES);
+        }
+
         return completedCourseCodes;
     }
 
     private String getCellValue(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+
         return switch (cell.getCellType()) {
             case STRING ->
                     cell.getStringCellValue().trim();
