@@ -309,7 +309,7 @@ public class CourseCandidateProvider {
 
         return studentMajors.stream()
                 .map(this::normalizeMajorName)
-                .map(MAJOR_EXPLORATION_GROUP_ALIASES::get)
+                .map(normalizedMajor -> MAJOR_EXPLORATION_GROUP_ALIASES.getOrDefault(normalizedMajor, normalizedMajor))
                 .filter(group -> group != null && !group.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
