@@ -2,12 +2,15 @@ package com.skhuthon_backend.domain.course.service;
 
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
+import com.skhuthon_backend.domain.course.entity.Course;
 import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
+import com.skhuthon_backend.domain.course.repository.CourseRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -26,6 +29,7 @@ import java.util.stream.Collectors;
 //- 기이수 과목 제외
 //- OfferingTime 조회
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class CourseCandidateProvider {
@@ -39,8 +43,18 @@ public class CourseCandidateProvider {
     );
     private static final String SOFTWARE_CONVERGENCE_COMMON_MAJOR = "소프트웨어융합전공";
 
+    // 교육과정 개편으로 과목명이 바뀌면서 구 명칭 과목이 DB에 남아있는 경우,
+    // 신 명칭 과목과 중복 노출되지 않도록 구 명칭 과목은 후보에서 항상 제외하고,
+    // 학생이 구 명칭으로 이미 이수했다면(course_code가 달라 기이수 필터로는 못 걸러짐)
+    // 대응하는 신 명칭도 후보에서 제외한다.
+    private static final Map<String, String> RENAMED_COURSE_NAMES = Map.of(
+            "프론트엔드개발", "프론트엔드프로그래밍",
+            "웹프로그래밍", "백엔드프로그래밍"
+    );
+
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
+    private final CourseRepository courseRepository;
 
     public CandidateContext findCandidates(CourseCandidateRequestDto request) {
         return findCandidates(
@@ -59,7 +73,7 @@ public class CourseCandidateProvider {
     }
 
     public CandidateContext findAllOfferings() {
-        List<CourseOffering> courseOfferings = courseOfferingRepository.findAll();
+        List<CourseOffering> courseOfferings = excludeSupersededCourses(courseOfferingRepository.findAll());
 
         return new CandidateContext(courseOfferings, findTimesByOfferingId(courseOfferings));
     }
@@ -69,7 +83,8 @@ public class CourseCandidateProvider {
                 .filter(courseOffering -> SELECTABLE_MAJOR_COURSE_TYPES.contains(courseOffering.getCategory().getLabel()))
                 .collect(Collectors.toList());
         List<CourseOffering> generalOfferings = courseOfferingRepository.findByCategory(CourseCategory.GENERAL);
-        List<CourseOffering> selectableOfferings = mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings);
+        List<CourseOffering> selectableOfferings =
+                excludeSupersededCourses(mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings));
 
         return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
     }
@@ -83,12 +98,45 @@ public class CourseCandidateProvider {
         List<CourseOffering> generalOfferings = findGeneralOfferings(studentYear);
         List<CourseOffering> candidateOfferings = mergeWithoutDuplicate(majorOfferings, generalOfferings);
         Set<String> completedCodeSet = toSet(completedCourseCodes);
+        Set<String> newNamesCompletedUnderOldName = resolveNewNamesCompletedUnderOldName(completedCodeSet);
 
-        List<CourseOffering> filteredOfferings = candidateOfferings.stream()
+        List<CourseOffering> filteredOfferings = excludeSupersededCourses(candidateOfferings.stream()
                 .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
-                .collect(Collectors.toList());
+                .filter(courseOffering -> !newNamesCompletedUnderOldName.contains(courseOffering.getCourse().getCourseName()))
+                .collect(Collectors.toList()));
 
         return new CandidateContext(filteredOfferings, findTimesByOfferingId(filteredOfferings));
+    }
+
+    // 구 명칭으로 이수한 과목이 있다면, 개편으로 바뀐 신 명칭도 이미 이수한 것으로 취급해 후보에서 제외한다.
+    private Set<String> resolveNewNamesCompletedUnderOldName(Set<String> completedCourseCodes) {
+        if (completedCourseCodes.isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        Set<String> newNames = courseRepository.findAllById(completedCourseCodes).stream()
+                .map(Course::getCourseName)
+                .filter(RENAMED_COURSE_NAMES::containsKey)
+                .map(RENAMED_COURSE_NAMES::get)
+                .collect(Collectors.toSet());
+
+        if (!newNames.isEmpty()) {
+            log.debug("구 명칭으로 이미 이수한 과목의 신 명칭을 후보에서 제외: {}", newNames);
+        }
+
+        return newNames;
+    }
+
+    private List<CourseOffering> excludeSupersededCourses(List<CourseOffering> offerings) {
+        List<CourseOffering> filteredOfferings = offerings.stream()
+                .filter(courseOffering -> !RENAMED_COURSE_NAMES.containsKey(courseOffering.getCourse().getCourseName()))
+                .collect(Collectors.toList());
+
+        if (filteredOfferings.size() != offerings.size()) {
+            log.debug("개편으로 대체된 구 명칭 과목 제외: 제외 전={}건, 제외 후={}건", offerings.size(), filteredOfferings.size());
+        }
+
+        return filteredOfferings;
     }
 
     private List<CourseOffering> findMajorOfferings(List<String> studentMajors) {
