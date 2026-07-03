@@ -10,6 +10,7 @@ import com.skhuthon_backend.domain.course.dto.TimetableCombinationResponseDto;
 import com.skhuthon_backend.domain.course.dto.TimetableGenerateRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
+import com.skhuthon_backend.parser.ParsedTranscript;
 import com.skhuthon_backend.parser.TranscriptParserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,7 +83,9 @@ public class TimetableEngineService {
             TimetableGenerateRequestDto request,
             MultipartFile transcript
     ) {
-        Set<String> completedCourseCodes = transcriptParserService.parse(transcript);
+        ParsedTranscript parsedTranscript = transcriptParserService.parse(transcript);
+        Set<String> completedCourseCodes = parsedTranscript.courseCodes();
+        Set<String> completedCourseNames = parsedTranscript.courseNames();
 
         TimetableCombinationRequestDto combinationRequest =
                 new TimetableCombinationRequestDto(
@@ -96,7 +99,7 @@ public class TimetableEngineService {
                 );
 
         CandidateContext context =
-                courseCandidateProvider.findCandidates(combinationRequest);
+                courseCandidateProvider.findCandidates(combinationRequest, completedCourseNames);
         if (context.offerings().isEmpty()) {
             log.warn("조건에 맞는 후보 강의가 없음: majors={}, completedCourseCodes={}건",
                     request.getStudentMajors(), completedCourseCodes.size());
