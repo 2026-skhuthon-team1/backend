@@ -53,6 +53,15 @@ public class CourseController {
     }
 
     @Operation(
+            summary = "교양필수 강좌 조회",
+            description = "1학년 교양필수 강좌를 교수, 분반, 강의 시간과 함께 조회합니다."
+    )
+    @GetMapping("/general-required-offerings")
+    public ResponseEntity<List<CourseOfferingCandidateResponseDto>> findGeneralRequiredOfferings() {
+        return ResponseEntity.ok(timetableEngineService.findGeneralRequiredOfferings());
+    }
+
+    @Operation(
             summary = "후보 과목 조회",
             description = "학생의 전공, 학년, 기이수 과목 정보를 바탕으로 수강 가능한 개설 강좌 후보를 조회합니다."
     )

@@ -6,7 +6,9 @@ public enum CourseCategory {
 
     MAJOR_REQUIRED("전공필수"),
     MAJOR_ELECTIVE("전공선택"),
-    GENERAL("교양");
+    GENERAL("교양"),
+    GENERAL_REQUIRED("교양필수"),
+    MAJOR_EXPLORATION("전공탐색");
 
     private final String label;
 
@@ -22,7 +24,8 @@ public enum CourseCategory {
         String normalizedDbValue = label.trim();
 
         return Arrays.stream(values())
-                .filter(category -> category.label.equals(normalizedDbValue))
+                .filter(category -> category.label.equals(normalizedDbValue)
+                        || category.name().equals(normalizedDbValue))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown course category: " + label));
     }

@@ -51,8 +51,8 @@ public class TimetableCombinationMapper {
             Map<Long, List<OfferingTime>> timesByOfferingId,
             TimetableCombinationRequestDto request
     ) {
-        int majorCredits = calculateCreditsByCategory(combination.offerings(), CourseCategory.MAJOR_ELECTIVE) + calculateCreditsByCategory(combination.offerings(), CourseCategory.MAJOR_REQUIRED) ;
-        int generalCredits = calculateCreditsByCategory(combination.offerings(), CourseCategory.GENERAL);
+        int majorCredits = calculateMajorCredits(combination.offerings());
+        int generalCredits = calculateGeneralCredits(combination.offerings());
 
         return TimetableCombinationResponseDto.builder()
                 .timetableId(timetableId)
@@ -87,6 +87,23 @@ public class TimetableCombinationMapper {
     private int calculateCreditsByCategory(List<CourseOffering> courseOfferings, CourseCategory category) {
         return courseOfferings.stream()
                 .filter(courseOffering -> courseOffering.getCategory() == category)
+                .mapToInt(this::getCredits)
+                .sum();
+    }
+
+    private int calculateMajorCredits(List<CourseOffering> courseOfferings) {
+        return courseOfferings.stream()
+                .filter(courseOffering -> courseOffering.getCategory() == CourseCategory.MAJOR_ELECTIVE
+                        || courseOffering.getCategory() == CourseCategory.MAJOR_REQUIRED
+                        || courseOffering.getCategory() == CourseCategory.MAJOR_EXPLORATION)
+                .mapToInt(this::getCredits)
+                .sum();
+    }
+
+    private int calculateGeneralCredits(List<CourseOffering> courseOfferings) {
+        return courseOfferings.stream()
+                .filter(courseOffering -> courseOffering.getCategory() == CourseCategory.GENERAL
+                        || courseOffering.getCategory() == CourseCategory.GENERAL_REQUIRED)
                 .mapToInt(this::getCredits)
                 .sum();
     }
