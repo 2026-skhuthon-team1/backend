@@ -26,7 +26,7 @@ public class TranscriptExcelParser {
     private static final Set<String> CHAPEL_COURSE_CODES = Set.of("AK00113", "AK00114");
     private static final int REQUIRED_CHAPEL_COMPLETION_COUNT = 2;
 
-    public Set<String> parse(MultipartFile file) {
+    public ParsedTranscript parse(MultipartFile file) {
 
         validateFile(file);
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
@@ -44,7 +44,7 @@ public class TranscriptExcelParser {
                 throw new InvalidExcelFormatException("'과목명' 컬럼을 찾을 수 없습니다.");
             }
 
-            return parseCompletedCourseCodes(
+            return parseCompletedCourses(
                     sheet,
                     headerRow.getRowNum() + 1,
                     courseCodeColumn,
@@ -78,13 +78,14 @@ public class TranscriptExcelParser {
         return headerMap;
     }
 
-    private Set<String> parseCompletedCourseCodes(
+    private ParsedTranscript parseCompletedCourses(
             Sheet sheet,
             int startRow,
             int courseCodeColumn,
             int courseNameColumn
     ) {
         Set<String> completedCourseCodes = new HashSet<>();
+        Set<String> completedCourseNames = new HashSet<>();
         int completedChapelCount = 0;
 
         for (int i = startRow; i <= sheet.getLastRowNum(); i++) {
@@ -98,6 +99,9 @@ public class TranscriptExcelParser {
 
             if (!courseCode.isBlank()) {
                 completedCourseCodes.add(courseCode);
+                if (!courseName.isBlank()) {
+                    completedCourseNames.add(courseName);
+                }
             }
 
             if (courseName.contains(CHAPEL_KEYWORD)) {
@@ -111,7 +115,7 @@ public class TranscriptExcelParser {
             completedCourseCodes.addAll(CHAPEL_COURSE_CODES);
         }
 
-        return completedCourseCodes;
+        return new ParsedTranscript(completedCourseCodes, completedCourseNames);
     }
 
     private String getCellValue(Cell cell) {
