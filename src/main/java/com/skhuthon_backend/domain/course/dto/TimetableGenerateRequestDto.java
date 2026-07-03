@@ -10,11 +10,12 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -55,6 +56,10 @@ public class TimetableGenerateRequestDto {
     @Schema(description = "1교시(09:00 시작) 강의 제외 여부", example = "true")
     @NotNull(message = "1교시 제외 여부는 필수입니다.")
     private Boolean excludeFirstPeriod;
+
+    @Schema(description = "사회봉사 과목 포함 여부 (1학년은 이 값과 무관하게 항상 제외됩니다)", example = "true")
+    @NotNull(message = "사회봉사 포함 여부는 필수입니다.")
+    private Boolean includeSocialService;
 
     @ArraySchema(
             arraySchema = @Schema(description = "1학년 교양필수 선택 강좌 목록"),
