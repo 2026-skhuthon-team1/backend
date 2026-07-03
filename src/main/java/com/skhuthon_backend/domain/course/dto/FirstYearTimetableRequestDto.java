@@ -13,12 +13,12 @@ import java.util.List;
 
 public record FirstYearTimetableRequestDto(
         @ArraySchema(
-                arraySchema = @Schema(description = "학생의 소속 전공/학부 목록"),
-                schema = @Schema(description = "전공명", example = "소프트웨어융합전공")
+                arraySchema = @Schema(description = "학생의 소속 학부 목록"),
+                schema = @Schema(description = "학부명", example = "소프트웨어융합학부")
         )
-        @NotEmpty(message = "전공 목록은 필수입니다.")
-        @Size(max = 2, message = "전공은 최대 2개까지 입력할 수 있습니다.")
-        List<@NotBlank(message = "전공명은 비어 있을 수 없습니다.") String> studentMajors,
+        @NotEmpty(message = "학부 목록은 필수입니다.")
+        @Size(max = 2, message = "학부는 최대 1개까지 입력할 수 있습니다.")
+        List<@NotBlank(message = "학부명은 비어 있을 수 없습니다.") String> studentMajors,
 
         @Schema(description = "전공 목표 학점", example = "0")
         @NotNull(message = "전공 목표 학점은 필수입니다.")
@@ -44,6 +44,6 @@ public record FirstYearTimetableRequestDto(
                 arraySchema = @Schema(description = "선택한 교양필수 강좌 목록"),
                 schema = @Schema(description = "교양필수 과목별 교수/시간 선택")
         )
-        List<@Valid GeneralRequiredCourseSelectionDto> generalRequiredCourses
+        List<@Valid GeneralRequiredCourseSelectionDto> fixedCourses
 ) {
 }

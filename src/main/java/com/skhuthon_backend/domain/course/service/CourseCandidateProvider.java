@@ -8,6 +8,12 @@ import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.text.Normalizer;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,9 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
@@ -383,29 +386,90 @@ public class CourseCandidateProvider {
         return new ArrayList<>(offeringsById.values());
     }
 
+    // courseName + professor만으로 대부분은 유일하게 찾아지지만, 같은 교수가 같은 과목을 여러 분반으로
+    // 개설한 경우(예: 화요일반/목요일반이 서로 다른 분반인 경우) 여러 건이 남을 수 있다.
+    // 이때만 day/start/end로 추가로 좁힌다.
     private CourseOffering findMatchingGeneralRequiredOffering(
             GeneralRequiredCourseSelectionDto selection,
             List<CourseOffering> offerings,
             Map<Long, List<OfferingTime>> timesByOfferingId
     ) {
-        return offerings.stream()
+        List<CourseOffering> matchedByCourseName = offerings.stream()
                 .filter(offering -> matchesCourseName(offering, selection.courseName()))
+                .collect(Collectors.toList());
+        List<CourseOffering> matchedByCourseAndProfessor = matchedByCourseName.stream()
                 .filter(offering -> matchesProfessor(offering, selection.professor()))
+                .collect(Collectors.toList());
+
+        if (matchedByCourseAndProfessor.isEmpty()) {
+            log.warn(
+                    "교양필수 매칭 실패: 요청 courseName='{}'(정규화='{}'), professor='{}'(정규화='{}'), "
+                            + "이름 일치 후보 수={}, 전체 교양필수 강의 수={}",
+                    selection.courseName(), normalizeCourseName(selection.courseName()),
+                    selection.professor(), normalizeProfessor(selection.professor()),
+                    matchedByCourseName.size(), offerings.size()
+            );
+            matchedByCourseName.forEach(offering -> log.warn(
+                    "  이름은 일치하는 DB 후보: courseCode={}, courseName='{}', professor='{}'(정규화='{}')",
+                    offering.getCourse().getCourseCode(), offering.getCourse().getCourseName(),
+                    offering.getProfessor(), normalizeProfessor(offering.getProfessor())
+            ));
+            throw new IllegalArgumentException(
+                    "일치하는 교양필수 강좌를 찾을 수 없습니다: courseName=%s, professor=%s"
+                            .formatted(selection.courseName(), selection.professor())
+            );
+        }
+
+        if (matchedByCourseAndProfessor.size() == 1) {
+            return matchedByCourseAndProfessor.get(0);
+        }
+
+        CourseOffering matched = matchedByCourseAndProfessor.stream()
                 .filter(offering -> hasMatchingTime(
                         timesByOfferingId.getOrDefault(offering.getId(), Collections.emptyList()),
                         selection
                 ))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "일치하는 교양필수 강좌를 찾을 수 없습니다: courseName=%s, professor=%s, day=%s, time=%s-%s"
-                                .formatted(
-                                        selection.courseName(),
-                                        selection.professor(),
-                                        selection.dayOfWeek(),
-                                        selection.startTime(),
-                                        selection.endTime()
-                                )
-                ));
+                .orElse(null);
+
+        if (matched == null) {
+            log.warn(
+                    "교양필수 매칭 실패(분반 여러 개, 시간 불일치): 요청 day={}, start={}, end={}, 후보 분반 수={}",
+                    selection.day(), selection.start(), selection.end(), matchedByCourseAndProfessor.size()
+            );
+            matchedByCourseAndProfessor.forEach(offering -> log.warn(
+                    "  분반 후보: offeringId={}, sectionNo={}, times={}",
+                    offering.getId(), offering.getSectionNo(),
+                    timesByOfferingId.getOrDefault(offering.getId(), Collections.emptyList()).stream()
+                            .map(time -> "%s %s-%s".formatted(time.getDayOfWeek().getLabel(), time.getStartTime(), time.getEndTime()))
+                            .collect(Collectors.toList())
+            ));
+            throw new IllegalArgumentException(
+                    "일치하는 교양필수 강좌를 찾을 수 없습니다: courseName=%s, professor=%s, day=%s, start=%s, end=%s"
+                            .formatted(selection.courseName(), selection.professor(), selection.day(), selection.start(), selection.end())
+            );
+        }
+
+        return matched;
+    }
+
+    // day/start/end가 비어 있으면 시간 조건 없이 통과시킨다. day가 있으면 그 요일의 시간이 있어야 하고,
+    // start/end가 주어졌다면 그 값과도 일치해야 한다.
+    private boolean hasMatchingTime(List<OfferingTime> times, GeneralRequiredCourseSelectionDto selection) {
+        String requestedDay = selection.day();
+        if (requestedDay == null || requestedDay.isBlank()) {
+            return true;
+        }
+
+        return times.stream().anyMatch(time ->
+                time.getDayOfWeek().getLabel().equals(requestedDay)
+                        && matchesRequestedTime(time.getStartTime(), selection.start())
+                        && matchesRequestedTime(time.getEndTime(), selection.end())
+        );
+    }
+
+    private boolean matchesRequestedTime(LocalTime actual, LocalTime requested) {
+        return requested == null || requested.equals(actual);
     }
 
     private boolean matchesCourseName(CourseOffering offering, String requestedCourseName) {
@@ -418,12 +482,14 @@ public class CourseCandidateProvider {
         return normalizeCourseName(offering.getCourse().getCourseName()).equals(canonicalRequestedName);
     }
 
+    // 공백만 제거해서는 부족하다 - 프론트/DB가 서로 다른 한글 유니코드 정규화 형태(NFC/NFD)를 쓰면
+    // 육안으로 같아 보이는 문자열도 equals()에서 다르게 취급된다. NFC로 통일해서 비교한다.
     private String normalizeCourseName(String courseName) {
         if (courseName == null) {
             return "";
         }
 
-        return courseName.replaceAll("\\s+", "");
+        return Normalizer.normalize(courseName, Normalizer.Form.NFC).replaceAll("\\s+", "");
     }
 
     private String normalizeMajorName(String majorName) {
@@ -431,7 +497,7 @@ public class CourseCandidateProvider {
             return "";
         }
 
-        return majorName.replaceAll("\\s+", "");
+        return Normalizer.normalize(majorName, Normalizer.Form.NFC).replaceAll("\\s+", "");
     }
 
     private boolean matchesProfessor(CourseOffering offering, String requestedProfessor) {
@@ -443,17 +509,7 @@ public class CourseCandidateProvider {
             return "";
         }
 
-        return professor.replaceAll("\\s+", "");
-    }
-
-    private boolean hasMatchingTime(
-            List<OfferingTime> times,
-            GeneralRequiredCourseSelectionDto selection
-    ) {
-        return times.stream()
-                .anyMatch(time -> time.getDayOfWeek() == selection.dayOfWeek()
-                        && time.getStartTime().equals(selection.startTime())
-                        && time.getEndTime().equals(selection.endTime()));
+        return Normalizer.normalize(professor, Normalizer.Form.NFC).replaceAll("\\s+", "");
     }
 
     private Set<String> toSet(Collection<String> values) {

@@ -179,7 +179,7 @@ public class TimetableEngineService {
                         request.getFreeDays(),
                         request.getExcludeFirstPeriod(),
                         completedCourseCodes.stream().toList(),
-                        request.getGeneralRequiredCourses()
+                        request.getFixedCourses()
                 );
 
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(combinationRequest);
@@ -243,7 +243,7 @@ public class TimetableEngineService {
     private CandidateContext resolveFixedGeneralRequiredContext(TimetableCombinationRequestDto request) {
         validateGeneralRequiredSelections(request);
 
-        return courseCandidateProvider.findSelectedGeneralRequiredOfferings(request.generalRequiredCourses());
+        return courseCandidateProvider.findSelectedGeneralRequiredOfferings(request.fixedCourses());
     }
 
     private TimetableCombinationRequestDto toFirstYearCombinationRequest(
@@ -258,15 +258,15 @@ public class TimetableEngineService {
                 request.freeDays(),
                 request.excludeFirstPeriod(),
                 completedCourseCodes,
-                request.generalRequiredCourses()
+                request.fixedCourses()
         );
     }
 
     private void validateGeneralRequiredSelections(TimetableCombinationRequestDto request) {
         List<GeneralRequiredCourseSelectionDto> selections =
-                request.generalRequiredCourses() == null
+                request.fixedCourses() == null
                         ? Collections.emptyList()
-                        : request.generalRequiredCourses();
+                        : request.fixedCourses();
 
         if (request.studentYear() == null || request.studentYear() != FIRST_YEAR) {
             return;
