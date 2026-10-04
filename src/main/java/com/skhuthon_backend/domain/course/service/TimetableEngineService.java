@@ -40,7 +40,9 @@ public class TimetableEngineService {
             "말과글",
             "과학기술과에콜로지",
             "디지털리터러시",
-            "대학생활세미나"
+            "대학생활세미나",
+            "전공진로세미나",
+            "자유전공팀세미나"
     );
     private static final Map<String, String> REQUIRED_GENERAL_COURSE_NAME_ALIASES = Map.of(
             "데이터리터러시", "디지털리터러시"
@@ -272,7 +274,7 @@ public class TimetableEngineService {
 
         if (!REQUIRED_GENERAL_COURSE_NAMES.containsAll(selectedCourseNames)) {
             throw new IllegalArgumentException(
-                    "교양필수 선택 과목은 인권과평화, 말과글, 데이터리터러시, 대학생활세미나, 과학기술과에콜로지 중 하나여야 합니다."
+                    "교양필수 선택 과목은 인권과평화, 말과글, 데이터리터러시, 대학생활세미나, 전공진로세미나, 자유전공팀세미나, 과학기술과에콜로지 중 하나여야 합니다."
             );
         }
     }
