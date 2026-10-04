@@ -88,6 +88,10 @@ public class TimetableEngineService {
         return generateTimetableCombinations(request, Collections.emptySet());
     }
 
+    public int getCurrentSemester() {
+        return currentSemester;
+    }
+
     @Transactional(readOnly = true)
     public List<TimetableCombinationResponseDto> generateFirstYearFirstSemester(
             FirstYearTimetableRequestDto request

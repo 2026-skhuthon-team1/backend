@@ -10,9 +10,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +29,15 @@ import org.springframework.web.multipart.MultipartFile;
 public class TimetableController {
 
     private final TimetableEngineService timetableEngineService;
+
+    @Operation(
+            summary = "현재 학기 조회",
+            description = "개설강좌 데이터의 학기(1 또는 2)를 반환합니다. 2학기면 1학년 1학기 시간표는 생성할 수 없습니다."
+    )
+    @GetMapping("/current-semester")
+    public ResponseEntity<Map<String, Integer>> getCurrentSemester() {
+        return ResponseEntity.ok(Map.of("semester", timetableEngineService.getCurrentSemester()));
+    }
 
     @Operation(
             summary = "1학년 1학기 시간표 생성",
