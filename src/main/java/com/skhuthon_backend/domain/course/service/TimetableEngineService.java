@@ -40,7 +40,9 @@ public class TimetableEngineService {
             "말과글",
             "과학기술과에콜로지",
             "디지털리터러시",
-            "대학생활세미나"
+            "대학생활세미나",
+            "전공진로세미나",
+            "자유전공팀세미나"
     );
     private static final Map<String, String> REQUIRED_GENERAL_COURSE_NAME_ALIASES = Map.of(
             "데이터리터러시", "디지털리터러시"
