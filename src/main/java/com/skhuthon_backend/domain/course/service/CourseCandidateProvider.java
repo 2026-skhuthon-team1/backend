@@ -191,6 +191,8 @@ public class CourseCandidateProvider {
             List<String> completedCourseCodes,
             Set<String> completedCourseNames
     ) {
+        validateFreeMajorYear(studentMajors, studentYear);
+
         List<CourseOffering> majorOfferings = mergeWithoutDuplicate(
                 findMajorOfferings(studentMajors, studentYear),
                 findMajorExplorationOfferings(studentMajors, studentYear)
@@ -285,11 +287,21 @@ public class CourseCandidateProvider {
             return Collections.emptyList();
         }
 
+        // 자유전공 학생은 함께 보낸 학부의 전공탐색만 후보로 쓰고, 학부를 고르지 않았다면 전체 학부를 후보로 둔다.
+        boolean allowAllGroups = freeMajorStudent && eligibleSectionGroups.isEmpty();
+
         return courseOfferingRepository.findByCategory(CourseCategory.MAJOR_EXPLORATION).stream()
-                .filter(courseOffering -> freeMajorStudent
+                .filter(courseOffering -> allowAllGroups
                         || eligibleSectionGroups.contains(courseOffering.getSectionGroup()))
                 .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
                 .collect(Collectors.toList());
+    }
+
+    // 자유전공은 1학년에만 존재한다. 2학년부터는 전공을 정해야 하므로 자유전공으로 요청하면 거절한다.
+    private void validateFreeMajorYear(List<String> studentMajors, Integer studentYear) {
+        if (isFreeMajorStudent(studentMajors) && (studentYear == null || studentYear != 1)) {
+            throw new IllegalArgumentException("자유전공은 1학년만 선택할 수 있습니다: studentYear=%s".formatted(studentYear));
+        }
     }
 
     private boolean isFreeMajorStudent(List<String> studentMajors) {
@@ -309,6 +321,7 @@ public class CourseCandidateProvider {
 
         return studentMajors.stream()
                 .map(this::normalizeMajorName)
+                .filter(normalizedMajor -> !FREE_MAJOR_GROUP_NAMES.contains(normalizedMajor))
                 .map(normalizedMajor -> MAJOR_EXPLORATION_GROUP_ALIASES.getOrDefault(normalizedMajor, normalizedMajor))
                 .filter(group -> group != null && !group.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
