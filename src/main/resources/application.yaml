@@ -14,6 +14,10 @@ spring:
         format_sql: false
         highlight_sql: false
 
+timetable:
+  # 개설강좌 데이터의 학기(1 또는 2). 2학기면 1학년 1학기 시간표 요청에 경고를 돌려준다.
+  current-semester: ${CURRENT_SEMESTER:2}
+
 ai:
   service:
     base-url: ${AI_SERVICE_BASE_URL}
