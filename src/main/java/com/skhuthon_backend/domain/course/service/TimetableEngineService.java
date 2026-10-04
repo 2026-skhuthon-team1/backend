@@ -207,7 +207,10 @@ public class TimetableEngineService {
             );
         }
 
+        CandidateContext socialServiceContext =
+                resolveSocialServiceContext(request, completedCourseCodes, completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(context, fixedContext);
+        timesByOfferingId.putAll(socialServiceContext.timesByOfferingId());
 
         List<CourseOffering> filteredOfferings =
                 timetableConstraintFilter.apply(
@@ -220,7 +223,7 @@ public class TimetableEngineService {
         }
 
         List<CourseOffering> eligibleSocialServiceOfferings =
-                resolveEligibleSocialServiceOfferings(context, request, combinationRequest);
+                timetableConstraintFilter.apply(socialServiceContext.offerings(), timesByOfferingId, combinationRequest);
         if (Boolean.TRUE.equals(request.getIncludeSocialService()) && eligibleSocialServiceOfferings.isEmpty()) {
             log.warn(
                     "사회봉사 포함이 요청되었지만 제약조건을 만족하는 사회봉사 강의가 없어 제외됨: studentYear={}",
@@ -313,23 +316,23 @@ public class TimetableEngineService {
     }
 
     // 사회봉사는 1학년 수강이 불가능하고, 그 외 학년은 프론트에서 받은 포함 여부가 true일 때만 강제 포함 대상이 된다.
-    // 분반(시간)이 여러 개일 수 있으므로 1교시 제외 등 제약조건을 만족하는 분반만 후보로 남긴다.
-    private List<CourseOffering> resolveEligibleSocialServiceOfferings(
-            CandidateContext context,
+    // 분반(시간)이 여러 개일 수 있으므로, 호출하는 쪽에서 1교시 제외 등 제약조건을 만족하는 분반만 남긴다.
+    private CandidateContext resolveSocialServiceContext(
             TimetableGenerateRequestDto request,
-            TimetableCombinationRequestDto combinationRequest
+            Set<String> completedCourseCodes,
+            Set<String> completedCourseNames
     ) {
         boolean isFirstYear = request.getStudentYear() != null && FIRST_YEAR == request.getStudentYear();
         boolean includeSocialService = Boolean.TRUE.equals(request.getIncludeSocialService());
         if (isFirstYear || !includeSocialService) {
-            return Collections.emptyList();
+            return new CandidateContext(Collections.emptyList(), Collections.emptyMap());
         }
 
-        List<CourseOffering> socialServiceOfferings = context.offerings().stream()
-                .filter(courseOffering -> courseOffering.getCourse().getCourseName().contains(SOCIAL_SERVICE_KEYWORD))
-                .collect(Collectors.toList());
-
-        return timetableConstraintFilter.apply(socialServiceOfferings, context.timesByOfferingId(), combinationRequest);
+        return courseCandidateProvider.findSocialServiceOfferings(
+                request.getStudentYear(),
+                completedCourseCodes.stream().toList(),
+                completedCourseNames
+        );
     }
 
     // 사회봉사 분반마다 각각 고정 후보로 넣어 조합을 생성한 뒤 합친다.
