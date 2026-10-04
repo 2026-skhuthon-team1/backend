@@ -1,6 +1,8 @@
 package com.skhuthon_backend.domain.course.service;
 
 import com.skhuthon_backend.domain.ai.dto.AiRankingResponseDto;
+import com.skhuthon_backend.domain.ai.exception.AiRankingException;
+import com.skhuthon_backend.domain.ai.model.FallbackTimetableRanker;
 import com.skhuthon_backend.domain.ai.model.TimetableCandidateReducer;
 import com.skhuthon_backend.domain.ai.service.FastApiService;
 import com.skhuthon_backend.domain.course.dto.CourseCandidateRequestDto;
@@ -61,6 +63,7 @@ public class TimetableEngineService {
     private final TranscriptParserService transcriptParserService;
     private final FastApiService fastApiService;
     private final TimetableCandidateReducer timetableCandidateReducer;
+    private final FallbackTimetableRanker fallbackTimetableRanker;
 
     @Transactional(readOnly = true)
     public List<CourseOfferingCandidateResponseDto> findAllOfferings() {
@@ -118,7 +121,7 @@ public class TimetableEngineService {
 
         List<TimetableCombination> reducedCombinations =
                 generateReducedCombinations(combinationRequest, parsedTranscript.courseNames());
-        List<AiRankingResponseDto> rankings = fastApiService.rank(reducedCombinations);
+        List<AiRankingResponseDto> rankings = rankOrFallback(reducedCombinations);
 
         return timetableCombinationMapper.toRecommendationResponses(
                 rankings,
@@ -246,12 +249,28 @@ public class TimetableEngineService {
         List<TimetableCombination> reducedCombinations =
                 timetableCandidateReducer.reduce(combinations);
 
-        List<AiRankingResponseDto> rankings = fastApiService.rank(reducedCombinations);
+        List<AiRankingResponseDto> rankings = rankOrFallback(reducedCombinations);
 
         return timetableCombinationMapper.toRecommendationResponses(
                 rankings,
                 reducedCombinations
         );
+    }
+
+    // AI 랭킹 서버가 느리거나 실패해도 시간표는 보여줘야 하므로, 실패·빈 응답이면 백엔드 기준으로 정렬해 대신 쓴다
+    private List<AiRankingResponseDto> rankOrFallback(List<TimetableCombination> combinations) {
+        try {
+            List<AiRankingResponseDto> rankings = fastApiService.rank(combinations);
+            if (!combinations.isEmpty() && (rankings == null || rankings.isEmpty())) {
+                log.warn("AI 랭킹이 비어 있어 대체 랭킹을 사용함: 조합 수={}", combinations.size());
+                return fallbackTimetableRanker.rank(combinations);
+            }
+
+            return rankings;
+        } catch (AiRankingException e) {
+            log.warn("AI 랭킹 실패로 대체 랭킹을 사용함: 조합 수={}, 원인={}", combinations.size(), e.getMessage());
+            return fallbackTimetableRanker.rank(combinations);
+        }
     }
 
     private CandidateContext resolveFixedGeneralRequiredContext(TimetableCombinationRequestDto request) {
