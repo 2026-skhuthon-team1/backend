@@ -107,6 +107,8 @@ public class CourseCandidateProvider {
             "자유전공"
     );
 
+    private static final String SOCIAL_SERVICE_KEYWORD = "사회봉사";
+
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
 
@@ -176,6 +178,24 @@ public class CourseCandidateProvider {
                 excludeSupersededCourses(mergeWithoutDuplicate(selectableMajorOfferings, generalOfferings));
 
         return new CandidateContext(selectableOfferings, findTimesByOfferingId(selectableOfferings));
+    }
+
+    // 사회봉사는 교양필수라 findCandidates(전공 + 일반 교양)에 들어오지 않는다. 포함 요청 시 여기서 따로 찾는다.
+    public CandidateContext findSocialServiceOfferings(
+            Integer studentYear,
+            List<String> completedCourseCodes,
+            Set<String> completedCourseNames
+    ) {
+        Set<String> completedCodeSet = toSet(completedCourseCodes);
+        List<CourseOffering> socialServiceOfferings =
+                courseOfferingRepository.findByCategory(CourseCategory.GENERAL_REQUIRED).stream()
+                        .filter(courseOffering -> courseOffering.getCourse().getCourseName().contains(SOCIAL_SERVICE_KEYWORD))
+                        .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
+                        .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
+                        .filter(courseOffering -> !completedCourseNames.contains(courseOffering.getCourse().getCourseName()))
+                        .collect(Collectors.toList());
+
+        return new CandidateContext(socialServiceOfferings, findTimesByOfferingId(socialServiceOfferings));
     }
 
     public CandidateContext findGeneralRequiredOfferings() {
