@@ -25,6 +25,8 @@ public class TimetableCombinationGenerator {
     private static final int MAX_COMBINATION_COUNT = 100;
     private static final Set<String> CHAPEL_COURSE_CODES = Set.of("AK00113", "AK00114");
     private static final String CHAPEL_SELECTION_KEY = "CHAPEL";
+    // 교양 목표 학점은 사회봉사를 뺀 교양 학점이다. 사회봉사는 포함 여부로 따로 고정해 넣는다.
+    private static final String SOCIAL_SERVICE_KEYWORD = "사회봉사";
 
     private final TimeConflictChecker timeConflictChecker;
     private final TimetableFeatureExtractor timetableFeatureExtractor;
@@ -185,7 +187,7 @@ public class TimetableCombinationGenerator {
 
         if (isMajorCategory(candidate.getCategory())) {
             nextMajorCredits += credits;
-        } else if (isGeneralCategory(candidate.getCategory())) {
+        } else if (countsTowardGeneralCredits(candidate)) {
             nextGeneralCredits += credits;
         }
 
@@ -275,7 +277,7 @@ public class TimetableCombinationGenerator {
 
         for (int index = candidates.size() - 1; index >= 0; index--) {
             CourseOffering candidate = candidates.get(index);
-            int additionalCredits = isGeneralCategory(candidate.getCategory()) ? getCredits(candidate) : 0;
+            int additionalCredits = countsTowardGeneralCredits(candidate) ? getCredits(candidate) : 0;
             remainingCredits[index] = remainingCredits[index + 1] + additionalCredits;
         }
 
@@ -291,7 +293,7 @@ public class TimetableCombinationGenerator {
 
     private int calculateGeneralCredits(List<CourseOffering> offerings) {
         return offerings.stream()
-                .filter(offering -> isGeneralCategory(offering.getCategory()))
+                .filter(this::countsTowardGeneralCredits)
                 .mapToInt(this::getCredits)
                 .sum();
     }
@@ -300,6 +302,11 @@ public class TimetableCombinationGenerator {
         return category == CourseCategory.MAJOR_ELECTIVE
                 || category == CourseCategory.MAJOR_REQUIRED
                 || category == CourseCategory.MAJOR_EXPLORATION;
+    }
+
+    private boolean countsTowardGeneralCredits(CourseOffering offering) {
+        return isGeneralCategory(offering.getCategory())
+                && !offering.getCourse().getCourseName().contains(SOCIAL_SERVICE_KEYWORD);
     }
 
     private boolean isGeneralCategory(CourseCategory category) {
