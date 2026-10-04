@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,6 +48,10 @@ public class TimetableEngineService {
     private static final Map<String, String> REQUIRED_GENERAL_COURSE_NAME_ALIASES = Map.of(
             "데이터리터러시", "디지털리터러시"
     );
+
+    // 개설강좌 데이터가 몇 학기 것인지. 지금 DB는 2학기(seed_2026_2.sql)라 1학년 1학기 학생은 존재하지 않는다.
+    @Value("${timetable.current-semester:2}")
+    private int currentSemester;
 
     private final CourseCandidateProvider courseCandidateProvider;
     private final TimetableConstraintFilter timetableConstraintFilter;
