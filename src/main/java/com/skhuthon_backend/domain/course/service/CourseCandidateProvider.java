@@ -287,8 +287,11 @@ public class CourseCandidateProvider {
             return Collections.emptyList();
         }
 
+        // 자유전공 학생은 함께 보낸 학부의 전공탐색만 후보로 쓰고, 학부를 고르지 않았다면 전체 학부를 후보로 둔다.
+        boolean allowAllGroups = freeMajorStudent && eligibleSectionGroups.isEmpty();
+
         return courseOfferingRepository.findByCategory(CourseCategory.MAJOR_EXPLORATION).stream()
-                .filter(courseOffering -> freeMajorStudent
+                .filter(courseOffering -> allowAllGroups
                         || eligibleSectionGroups.contains(courseOffering.getSectionGroup()))
                 .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
                 .collect(Collectors.toList());
@@ -318,6 +321,7 @@ public class CourseCandidateProvider {
 
         return studentMajors.stream()
                 .map(this::normalizeMajorName)
+                .filter(normalizedMajor -> !FREE_MAJOR_GROUP_NAMES.contains(normalizedMajor))
                 .map(normalizedMajor -> MAJOR_EXPLORATION_GROUP_ALIASES.getOrDefault(normalizedMajor, normalizedMajor))
                 .filter(group -> group != null && !group.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
