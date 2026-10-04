@@ -53,8 +53,9 @@ public class FallbackTimetableRanker {
                 .toList();
     }
 
-    // 등교일이 적을수록, 1교시·우주공강·점심 없는 날이 적을수록 높은 점수를 준다
-    private AiRankingResponseDto score(Long timetableId, TimetableCombination combination) {
+    // 등교일이 적을수록, 1교시·우주공강·점심 없는 날이 적을수록 높은 점수(0~100)를 준다.
+    // AI에 보낼 후보를 고를 때(TimetableCandidateReducer)도 이 점수로 좋은 시간표부터 본다.
+    public int scoreOf(TimetableCombination combination) {
         TimetableFeature feature = featureExtractor.extract(combination);
         int noLunchDays = feature.attendanceDays() - feature.lunchBreakCount();
 
@@ -63,9 +64,16 @@ public class FallbackTimetableRanker {
                 + feature.longBreakCount() * LONG_BREAK_PENALTY
                 + noLunchDays * NO_LUNCH_DAY_PENALTY;
 
+        return Math.max(0, MAX_SCORE - penalty);
+    }
+
+    private AiRankingResponseDto score(Long timetableId, TimetableCombination combination) {
+        TimetableFeature feature = featureExtractor.extract(combination);
+        int noLunchDays = feature.attendanceDays() - feature.lunchBreakCount();
+
         return AiRankingResponseDto.builder()
                 .timetableId(timetableId)
-                .score(Math.max(0, MAX_SCORE - penalty))
+                .score(scoreOf(combination))
                 .tags(toTags(combination, feature, noLunchDays))
                 .build();
     }
