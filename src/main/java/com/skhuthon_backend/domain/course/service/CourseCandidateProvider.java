@@ -191,6 +191,8 @@ public class CourseCandidateProvider {
             List<String> completedCourseCodes,
             Set<String> completedCourseNames
     ) {
+        validateFreeMajorYear(studentMajors, studentYear);
+
         List<CourseOffering> majorOfferings = mergeWithoutDuplicate(
                 findMajorOfferings(studentMajors, studentYear),
                 findMajorExplorationOfferings(studentMajors, studentYear)
@@ -290,6 +292,13 @@ public class CourseCandidateProvider {
                         || eligibleSectionGroups.contains(courseOffering.getSectionGroup()))
                 .filter(courseOffering -> isOfferedForStudentYear(courseOffering.getOfferedYear(), studentYear))
                 .collect(Collectors.toList());
+    }
+
+    // 자유전공은 1학년에만 존재한다. 2학년부터는 전공을 정해야 하므로 자유전공으로 요청하면 거절한다.
+    private void validateFreeMajorYear(List<String> studentMajors, Integer studentYear) {
+        if (isFreeMajorStudent(studentMajors) && (studentYear == null || studentYear != 1)) {
+            throw new IllegalArgumentException("자유전공은 1학년만 선택할 수 있습니다: studentYear=%s".formatted(studentYear));
+        }
     }
 
     private boolean isFreeMajorStudent(List<String> studentMajors) {
