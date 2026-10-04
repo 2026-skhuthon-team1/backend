@@ -13,6 +13,7 @@ import com.skhuthon_backend.domain.course.dto.TimetableGenerateRequestDto;
 import com.skhuthon_backend.domain.course.dto.TimetableRecommendationResponseDto;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
+import com.skhuthon_backend.domain.course.exception.SemesterNotOpenException;
 import com.skhuthon_backend.parser.ParsedTranscript;
 import com.skhuthon_backend.parser.TranscriptParserService;
 import java.util.ArrayList;
@@ -91,6 +92,12 @@ public class TimetableEngineService {
     public List<TimetableCombinationResponseDto> generateFirstYearFirstSemester(
             FirstYearTimetableRequestDto request
     ) {
+        if (currentSemester != 1) {
+            throw new SemesterNotOpenException(
+                    "현재는 %d학기라 1학년 1학기 시간표를 만들 수 없습니다. 1학년 2학기를 선택해 주세요.".formatted(currentSemester)
+            );
+        }
+
         TimetableCombinationRequestDto combinationRequest = toFirstYearCombinationRequest(request, Collections.emptyList());
 
         return generateTimetableCombinations(combinationRequest, Collections.emptySet());
