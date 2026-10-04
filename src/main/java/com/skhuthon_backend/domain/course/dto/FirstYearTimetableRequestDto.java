@@ -13,11 +13,11 @@ import java.util.List;
 
 public record FirstYearTimetableRequestDto(
         @ArraySchema(
-                arraySchema = @Schema(description = "학생의 소속 학부 목록"),
+                arraySchema = @Schema(description = "학생의 소속 학부 목록. 자유전공학부는 전공탐색 후보로 쓸 학부를 함께 보낼 수 있다(없으면 전체 학부)"),
                 schema = @Schema(description = "학부명", example = "소프트웨어융합학부")
         )
         @NotEmpty(message = "학부 목록은 필수입니다.")
-        @Size(max = 2, message = "학부는 최대 1개까지 입력할 수 있습니다.")
+        @Size(max = 7, message = "학부는 자유전공학부를 포함해 최대 7개까지 입력할 수 있습니다.")
         List<@NotBlank(message = "학부명은 비어 있을 수 없습니다.") String> studentMajors,
 
         @Schema(description = "전공 목표 학점", example = "0")
