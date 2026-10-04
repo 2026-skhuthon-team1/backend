@@ -27,6 +27,11 @@ public class FastApiService {
     public List<AiRankingResponseDto> rank(
             List<TimetableCombination> combinations
     ) {
+        if (combinations.isEmpty()) {
+            log.info("랭킹할 시간표 조합이 없어 AI 랭킹 서버 호출을 생략함");
+            return List.of();
+        }
+
         log.info("AI 랭킹 서버로 전송할 시간표 조합 수={}", combinations.size());
 
         AiTimetableRequestDto request =
