@@ -58,6 +58,29 @@ class TimetableCombinationGeneratorTest {
         assertThat(combinations.get(0).offerings()).containsExactlyInAnyOrder(socialService, threeCreditGeneral);
     }
 
+    @Test
+    void 교양필수와_채플은_교양_학점에_포함하지_않는다() {
+        CourseOffering generalRequired = offering(4L, "AC00007", "인권과평화", 2, CourseCategory.GENERAL_REQUIRED);
+        CourseOffering chapel = offering(5L, "AK00113", "비아메디아채플:그리스도교와세계", 1, CourseCategory.GENERAL);
+        Map<Long, List<OfferingTime>> times = Map.of(
+                2L, List.of(time(DayOfWeek.WED, 10)),
+                3L, List.of(time(DayOfWeek.THU, 10)),
+                4L, List.of(time(DayOfWeek.FRI, 10)),
+                5L, List.of(time(DayOfWeek.MON, 10))
+        );
+
+        List<TimetableCombination> combinations = generator.generate(
+                List.of(threeCreditGeneral, twoCreditGeneral),
+                times,
+                request(3),
+                List.of(generalRequired, chapel)
+        );
+
+        assertThat(combinations).hasSize(1);
+        assertThat(combinations.get(0).offerings())
+                .containsExactlyInAnyOrder(generalRequired, chapel, threeCreditGeneral);
+    }
+
     private TimetableCombinationRequestDto request(int targetGeneralCredits) {
         return new TimetableCombinationRequestDto(
                 List.of("소프트웨어공학전공"),
