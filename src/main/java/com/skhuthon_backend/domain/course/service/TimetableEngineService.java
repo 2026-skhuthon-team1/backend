@@ -212,12 +212,15 @@ public class TimetableEngineService {
 
         CandidateContext socialServiceContext =
                 resolveSocialServiceContext(request, completedCourseCodes, completedCourseNames);
+        CandidateContext chapelContext =
+                resolveChapelContext(request.getIncludeChapel(), completedCourseCodes.stream().toList(), completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(context, fixedContext);
         timesByOfferingId.putAll(socialServiceContext.timesByOfferingId());
+        timesByOfferingId.putAll(chapelContext.timesByOfferingId());
 
         List<CourseOffering> filteredOfferings =
                 timetableConstraintFilter.apply(
-                        excludeSocialServiceOfferings(context.offerings()),
+                        excludeOptionalFixedOfferings(context.offerings()),
                         timesByOfferingId,
                         combinationRequest
                 );
@@ -234,13 +237,19 @@ public class TimetableEngineService {
             );
         }
 
+        List<CourseOffering> eligibleChapelOfferings =
+                selectEligibleChapelOfferings(chapelContext, timesByOfferingId, combinationRequest);
+        if (Boolean.TRUE.equals(request.getIncludeChapel()) && eligibleChapelOfferings.isEmpty()) {
+            log.warn("채플 포함이 요청되었지만 이수하지 않았고 제약조건을 만족하는 채플 분반이 없어 제외됨");
+        }
+
         List<TimetableCombination> combinations =
                 generateWithOptionalFixedOfferings(
                         filteredOfferings,
                         timesByOfferingId,
                         combinationRequest,
                         fixedContext.offerings(),
-                        List.of(eligibleSocialServiceOfferings)
+                        List.of(eligibleSocialServiceOfferings, eligibleChapelOfferings)
                 );
         if (combinations.isEmpty()) {
             log.warn("생성된 시간표 조합이 없음: 필터링된 강의 수={}건", filteredOfferings.size());
@@ -325,13 +334,43 @@ public class TimetableEngineService {
         return REQUIRED_GENERAL_COURSE_NAME_ALIASES.getOrDefault(normalizedCourseName, normalizedCourseName);
     }
 
-    // 사회봉사는 사회봉사가 아닌 다른 교양과목과 동등하게 "선택 가능한" 후보로 두면 백트래킹이 굳이
-    // 사회봉사를 고르지 않고도 목표학점을 채울 수 있어, 체크했는데도 다른 교양이 들어가는 문제가 생긴다.
-    // 그래서 자유 선택 후보에서는 항상 제외하고, 대신 fixedOfferings로 강제 포함시킨다.
-    private List<CourseOffering> excludeSocialServiceOfferings(List<CourseOffering> offerings) {
+    // 사회봉사·채플을 다른 교양과목과 동등하게 "선택 가능한" 후보로 두면, 포함을 골라도 빠지거나
+    // 포함하지 않음을 골라도 들어갈 수 있다. 그래서 자유 선택 후보에서는 항상 제외하고, 포함 요청 시 fixedOfferings로 강제 포함시킨다.
+    private List<CourseOffering> excludeOptionalFixedOfferings(List<CourseOffering> offerings) {
         return offerings.stream()
                 .filter(courseOffering -> !courseOffering.getCourse().getCourseName().contains(SOCIAL_SERVICE_KEYWORD))
+                .filter(courseOffering -> !courseCandidateProvider.isChapel(courseOffering))
                 .collect(Collectors.toList());
+    }
+
+    private CandidateContext resolveChapelContext(
+            Boolean includeChapel,
+            List<String> completedCourseCodes,
+            Set<String> completedCourseNames
+    ) {
+        if (!Boolean.TRUE.equals(includeChapel)) {
+            return new CandidateContext(Collections.emptyList(), Collections.emptyMap());
+        }
+
+        return courseCandidateProvider.findChapelOfferings(completedCourseCodes, completedCourseNames);
+    }
+
+    // 채플은 분반이 많아, 1교시 제외 조건을 만족하는 분반 중 공강 희망 요일에 없는 분반을 우선 쓴다.
+    // 그런 분반이 없을 때만 공강 희망 요일의 분반도 쓴다(고정 과목은 공강 요일 검사를 받지 않으므로 여기서 거른다).
+    private List<CourseOffering> selectEligibleChapelOfferings(
+            CandidateContext chapelContext,
+            Map<Long, List<OfferingTime>> timesByOfferingId,
+            TimetableCombinationRequestDto request
+    ) {
+        List<CourseOffering> eligible =
+                timetableConstraintFilter.apply(chapelContext.offerings(), timesByOfferingId, request);
+        List<String> freeDays = request.freeDays() == null ? Collections.emptyList() : request.freeDays();
+        List<CourseOffering> notOnFreeDays = eligible.stream()
+                .filter(offering -> timesByOfferingId.getOrDefault(offering.getId(), Collections.emptyList()).stream()
+                        .noneMatch(time -> freeDays.contains(time.getDayOfWeek().getLabel())))
+                .collect(Collectors.toList());
+
+        return notOnFreeDays.isEmpty() ? eligible : notOnFreeDays;
     }
 
     // 사회봉사는 1학년 수강이 불가능하고, 그 외 학년은 프론트에서 받은 포함 여부가 true일 때만 강제 포함 대상이 된다.
