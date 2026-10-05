@@ -235,12 +235,12 @@ public class TimetableEngineService {
         }
 
         List<TimetableCombination> combinations =
-                generateCombinationsWithOptionalSocialService(
+                generateWithOptionalFixedOfferings(
                         filteredOfferings,
                         timesByOfferingId,
                         combinationRequest,
                         fixedContext.offerings(),
-                        eligibleSocialServiceOfferings
+                        List.of(eligibleSocialServiceOfferings)
                 );
         if (combinations.isEmpty()) {
             log.warn("생성된 시간표 조합이 없음: 필터링된 강의 수={}건", filteredOfferings.size());
@@ -354,34 +354,39 @@ public class TimetableEngineService {
         );
     }
 
-    // 사회봉사 분반마다 각각 고정 후보로 넣어 조합을 생성한 뒤 합친다.
-    // 이렇게 해야 어떤 분반을 쓰든 시간표에 사회봉사가 반드시 포함된다.
-    private List<TimetableCombination> generateCombinationsWithOptionalSocialService(
+    // 사회봉사·채플처럼 "분반 중 하나를 반드시 넣는" 과목은 그룹마다 분반 하나씩 고른 모든 경우를 고정 과목으로 넣어
+    // 조합을 생성한 뒤 합친다. 이렇게 해야 어떤 분반을 쓰든 시간표에 그 과목이 반드시 포함된다.
+    // 분반이 비어 있는 그룹(포함 안 함, 또는 조건에 맞는 분반 없음)은 건너뛴다.
+    private List<TimetableCombination> generateWithOptionalFixedOfferings(
             List<CourseOffering> filteredOfferings,
             Map<Long, List<OfferingTime>> timesByOfferingId,
             TimetableCombinationRequestDto combinationRequest,
             List<CourseOffering> fixedOfferings,
-            List<CourseOffering> eligibleSocialServiceOfferings
+            List<List<CourseOffering>> optionalFixedGroups
     ) {
-        if (eligibleSocialServiceOfferings.isEmpty()) {
-            return timetableCombinationGenerator.generate(
-                    filteredOfferings,
-                    timesByOfferingId,
-                    combinationRequest,
-                    fixedOfferings
-            );
+        List<List<CourseOffering>> fixedOfferingSets = List.of(fixedOfferings);
+        for (List<CourseOffering> group : optionalFixedGroups) {
+            if (group.isEmpty()) {
+                continue;
+            }
+            List<List<CourseOffering>> expanded = new ArrayList<>();
+            for (List<CourseOffering> fixedSet : fixedOfferingSets) {
+                for (CourseOffering offering : group) {
+                    List<CourseOffering> withOffering = new ArrayList<>(fixedSet);
+                    withOffering.add(offering);
+                    expanded.add(withOffering);
+                }
+            }
+            fixedOfferingSets = expanded;
         }
 
         List<TimetableCombination> combinations = new ArrayList<>();
-        for (CourseOffering socialServiceOffering : eligibleSocialServiceOfferings) {
-            List<CourseOffering> fixedOfferingsWithSocialService = new ArrayList<>(fixedOfferings);
-            fixedOfferingsWithSocialService.add(socialServiceOffering);
-
+        for (List<CourseOffering> fixedSet : fixedOfferingSets) {
             combinations.addAll(timetableCombinationGenerator.generate(
                     filteredOfferings,
                     timesByOfferingId,
                     combinationRequest,
-                    fixedOfferingsWithSocialService
+                    fixedSet
             ));
         }
 
