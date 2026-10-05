@@ -25,7 +25,7 @@ public class TimetableCombinationGenerator {
     private static final int MAX_COMBINATION_COUNT = 100;
     private static final Set<String> CHAPEL_COURSE_CODES = Set.of("AK00113", "AK00114");
     private static final String CHAPEL_SELECTION_KEY = "CHAPEL";
-    // 교양 목표 학점은 사회봉사를 뺀 교양 학점이다. 사회봉사는 포함 여부로 따로 고정해 넣는다.
+    // 교양 목표 학점은 교양선택 학점이다. 교양필수(1학년이 고른 과목 포함)·채플·사회봉사는 포함 여부나 고정 과목으로 따로 넣는다.
     private static final String SOCIAL_SERVICE_KEYWORD = "사회봉사";
 
     private final TimeConflictChecker timeConflictChecker;
@@ -305,13 +305,9 @@ public class TimetableCombinationGenerator {
     }
 
     private boolean countsTowardGeneralCredits(CourseOffering offering) {
-        return isGeneralCategory(offering.getCategory())
+        return offering.getCategory() == CourseCategory.GENERAL
+                && !CHAPEL_COURSE_CODES.contains(offering.getCourse().getCourseCode())
                 && !offering.getCourse().getCourseName().contains(SOCIAL_SERVICE_KEYWORD);
-    }
-
-    private boolean isGeneralCategory(CourseCategory category) {
-        return category == CourseCategory.GENERAL
-                || category == CourseCategory.GENERAL_REQUIRED;
     }
 
     private int getCredits(CourseOffering courseOffering) {

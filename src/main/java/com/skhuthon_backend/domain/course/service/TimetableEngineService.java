@@ -88,7 +88,7 @@ public class TimetableEngineService {
 
     @Transactional(readOnly = true)
     public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
-        return generateTimetableCombinations(request, Collections.emptySet());
+        return generateTimetableCombinations(request, Collections.emptySet(), false);
     }
 
     public int getCurrentSemester() {
@@ -107,7 +107,7 @@ public class TimetableEngineService {
 
         TimetableCombinationRequestDto combinationRequest = toFirstYearCombinationRequest(request, Collections.emptyList());
 
-        return generateTimetableCombinations(combinationRequest, Collections.emptySet());
+        return generateTimetableCombinations(combinationRequest, Collections.emptySet(), request.includeChapel());
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +120,7 @@ public class TimetableEngineService {
                 toFirstYearCombinationRequest(request, parsedTranscript.courseCodes().stream().toList());
 
         List<TimetableCombination> reducedCombinations =
-                generateReducedCombinations(combinationRequest, parsedTranscript.courseNames());
+                generateReducedCombinations(combinationRequest, parsedTranscript.courseNames(), request.includeChapel());
         List<AiRankingResponseDto> rankings = rankOrFallback(reducedCombinations);
 
         return timetableCombinationMapper.toRecommendationResponses(
@@ -131,13 +131,17 @@ public class TimetableEngineService {
 
     private List<TimetableCombinationResponseDto> generateTimetableCombinations(
             TimetableCombinationRequestDto request,
-            Set<String> completedCourseNames
+            Set<String> completedCourseNames,
+            Boolean includeChapel
     ) {
         List<TimetableCombination> reducedCombinations =
-                generateReducedCombinations(request, completedCourseNames);
+                generateReducedCombinations(request, completedCourseNames, includeChapel);
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(request);
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request, completedCourseNames);
+        CandidateContext chapelContext =
+                resolveChapelContext(includeChapel, request.completedCourseCodes(), completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(candidateContext, fixedContext);
+        timesByOfferingId.putAll(chapelContext.timesByOfferingId());
 
         return timetableCombinationMapper.toTimetableResponses(
                 reducedCombinations,
@@ -148,22 +152,27 @@ public class TimetableEngineService {
 
     private List<TimetableCombination> generateReducedCombinations(
             TimetableCombinationRequestDto request,
-            Set<String> completedCourseNames
+            Set<String> completedCourseNames,
+            Boolean includeChapel
     ) {
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(request);
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request, completedCourseNames);
+        CandidateContext chapelContext =
+                resolveChapelContext(includeChapel, request.completedCourseCodes(), completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(candidateContext, fixedContext);
+        timesByOfferingId.putAll(chapelContext.timesByOfferingId());
 
         List<CourseOffering> filteredOfferings = timetableConstraintFilter.apply(
-                candidateContext.offerings(),
+                excludeOptionalFixedOfferings(candidateContext.offerings()),
                 timesByOfferingId,
                 request
         );
-        List<TimetableCombination> combinations = timetableCombinationGenerator.generate(
+        List<TimetableCombination> combinations = generateWithOptionalFixedOfferings(
                 filteredOfferings,
                 timesByOfferingId,
                 request,
-                fixedContext.offerings()
+                fixedContext.offerings(),
+                List.of(selectEligibleChapelOfferings(chapelContext, timesByOfferingId, request))
         );
         List<TimetableCombination> reducedCombinations =
                 timetableCandidateReducer.reduce(combinations);
@@ -212,12 +221,15 @@ public class TimetableEngineService {
 
         CandidateContext socialServiceContext =
                 resolveSocialServiceContext(request, completedCourseCodes, completedCourseNames);
+        CandidateContext chapelContext =
+                resolveChapelContext(request.getIncludeChapel(), completedCourseCodes.stream().toList(), completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(context, fixedContext);
         timesByOfferingId.putAll(socialServiceContext.timesByOfferingId());
+        timesByOfferingId.putAll(chapelContext.timesByOfferingId());
 
         List<CourseOffering> filteredOfferings =
                 timetableConstraintFilter.apply(
-                        excludeSocialServiceOfferings(context.offerings()),
+                        excludeOptionalFixedOfferings(context.offerings()),
                         timesByOfferingId,
                         combinationRequest
                 );
@@ -234,13 +246,23 @@ public class TimetableEngineService {
             );
         }
 
+        List<CourseOffering> eligibleChapelOfferings =
+                selectEligibleChapelOfferings(chapelContext, timesByOfferingId, combinationRequest);
+        if (Boolean.TRUE.equals(request.getIncludeChapel())) {
+            if (chapelContext.offerings().isEmpty()) {
+                log.warn("채플 포함이 요청되었지만 남은 채플 분반이 없어 제외됨 (모두 이수했거나 개설 없음)");
+            } else if (eligibleChapelOfferings.isEmpty()) {
+                log.warn("채플 포함이 요청되었지만 남은 채플 분반이 모두 1교시라 제외됨: 분반 수={}", chapelContext.offerings().size());
+            }
+        }
+
         List<TimetableCombination> combinations =
-                generateCombinationsWithOptionalSocialService(
+                generateWithOptionalFixedOfferings(
                         filteredOfferings,
                         timesByOfferingId,
                         combinationRequest,
                         fixedContext.offerings(),
-                        eligibleSocialServiceOfferings
+                        List.of(eligibleSocialServiceOfferings, eligibleChapelOfferings)
                 );
         if (combinations.isEmpty()) {
             log.warn("생성된 시간표 조합이 없음: 필터링된 강의 수={}건", filteredOfferings.size());
@@ -325,13 +347,43 @@ public class TimetableEngineService {
         return REQUIRED_GENERAL_COURSE_NAME_ALIASES.getOrDefault(normalizedCourseName, normalizedCourseName);
     }
 
-    // 사회봉사는 사회봉사가 아닌 다른 교양과목과 동등하게 "선택 가능한" 후보로 두면 백트래킹이 굳이
-    // 사회봉사를 고르지 않고도 목표학점을 채울 수 있어, 체크했는데도 다른 교양이 들어가는 문제가 생긴다.
-    // 그래서 자유 선택 후보에서는 항상 제외하고, 대신 fixedOfferings로 강제 포함시킨다.
-    private List<CourseOffering> excludeSocialServiceOfferings(List<CourseOffering> offerings) {
+    // 사회봉사·채플을 다른 교양과목과 동등하게 "선택 가능한" 후보로 두면, 포함을 골라도 빠지거나
+    // 포함하지 않음을 골라도 들어갈 수 있다. 그래서 자유 선택 후보에서는 항상 제외하고, 포함 요청 시 fixedOfferings로 강제 포함시킨다.
+    private List<CourseOffering> excludeOptionalFixedOfferings(List<CourseOffering> offerings) {
         return offerings.stream()
                 .filter(courseOffering -> !courseOffering.getCourse().getCourseName().contains(SOCIAL_SERVICE_KEYWORD))
+                .filter(courseOffering -> !courseCandidateProvider.isChapel(courseOffering))
                 .collect(Collectors.toList());
+    }
+
+    private CandidateContext resolveChapelContext(
+            Boolean includeChapel,
+            List<String> completedCourseCodes,
+            Set<String> completedCourseNames
+    ) {
+        if (!Boolean.TRUE.equals(includeChapel)) {
+            return new CandidateContext(Collections.emptyList(), Collections.emptyMap());
+        }
+
+        return courseCandidateProvider.findChapelOfferings(completedCourseCodes, completedCourseNames);
+    }
+
+    // 채플은 분반이 많아, 1교시 제외 조건을 만족하는 분반 중 공강 희망 요일에 없는 분반을 우선 쓴다.
+    // 그런 분반이 없을 때만 공강 희망 요일의 분반도 쓴다(고정 과목은 공강 요일 검사를 받지 않으므로 여기서 거른다).
+    private List<CourseOffering> selectEligibleChapelOfferings(
+            CandidateContext chapelContext,
+            Map<Long, List<OfferingTime>> timesByOfferingId,
+            TimetableCombinationRequestDto request
+    ) {
+        List<CourseOffering> eligible =
+                timetableConstraintFilter.apply(chapelContext.offerings(), timesByOfferingId, request);
+        List<String> freeDays = request.freeDays() == null ? Collections.emptyList() : request.freeDays();
+        List<CourseOffering> notOnFreeDays = eligible.stream()
+                .filter(offering -> timesByOfferingId.getOrDefault(offering.getId(), Collections.emptyList()).stream()
+                        .noneMatch(time -> freeDays.contains(time.getDayOfWeek().getLabel())))
+                .collect(Collectors.toList());
+
+        return notOnFreeDays.isEmpty() ? eligible : notOnFreeDays;
     }
 
     // 사회봉사는 1학년 수강이 불가능하고, 그 외 학년은 프론트에서 받은 포함 여부가 true일 때만 강제 포함 대상이 된다.
@@ -354,34 +406,39 @@ public class TimetableEngineService {
         );
     }
 
-    // 사회봉사 분반마다 각각 고정 후보로 넣어 조합을 생성한 뒤 합친다.
-    // 이렇게 해야 어떤 분반을 쓰든 시간표에 사회봉사가 반드시 포함된다.
-    private List<TimetableCombination> generateCombinationsWithOptionalSocialService(
+    // 사회봉사·채플처럼 "분반 중 하나를 반드시 넣는" 과목은 그룹마다 분반 하나씩 고른 모든 경우를 고정 과목으로 넣어
+    // 조합을 생성한 뒤 합친다. 이렇게 해야 어떤 분반을 쓰든 시간표에 그 과목이 반드시 포함된다.
+    // 분반이 비어 있는 그룹(포함 안 함, 또는 조건에 맞는 분반 없음)은 건너뛴다.
+    private List<TimetableCombination> generateWithOptionalFixedOfferings(
             List<CourseOffering> filteredOfferings,
             Map<Long, List<OfferingTime>> timesByOfferingId,
             TimetableCombinationRequestDto combinationRequest,
             List<CourseOffering> fixedOfferings,
-            List<CourseOffering> eligibleSocialServiceOfferings
+            List<List<CourseOffering>> optionalFixedGroups
     ) {
-        if (eligibleSocialServiceOfferings.isEmpty()) {
-            return timetableCombinationGenerator.generate(
-                    filteredOfferings,
-                    timesByOfferingId,
-                    combinationRequest,
-                    fixedOfferings
-            );
+        List<List<CourseOffering>> fixedOfferingSets = List.of(fixedOfferings);
+        for (List<CourseOffering> group : optionalFixedGroups) {
+            if (group.isEmpty()) {
+                continue;
+            }
+            List<List<CourseOffering>> expanded = new ArrayList<>();
+            for (List<CourseOffering> fixedSet : fixedOfferingSets) {
+                for (CourseOffering offering : group) {
+                    List<CourseOffering> withOffering = new ArrayList<>(fixedSet);
+                    withOffering.add(offering);
+                    expanded.add(withOffering);
+                }
+            }
+            fixedOfferingSets = expanded;
         }
 
         List<TimetableCombination> combinations = new ArrayList<>();
-        for (CourseOffering socialServiceOffering : eligibleSocialServiceOfferings) {
-            List<CourseOffering> fixedOfferingsWithSocialService = new ArrayList<>(fixedOfferings);
-            fixedOfferingsWithSocialService.add(socialServiceOffering);
-
+        for (List<CourseOffering> fixedSet : fixedOfferingSets) {
             combinations.addAll(timetableCombinationGenerator.generate(
                     filteredOfferings,
                     timesByOfferingId,
                     combinationRequest,
-                    fixedOfferingsWithSocialService
+                    fixedSet
             ));
         }
 

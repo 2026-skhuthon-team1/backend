@@ -35,7 +35,7 @@ public record TimetableCombinationRequestDto(
         @Min(value = 0, message = "전공 목표 학점은 0 이상이어야 합니다.")
         Integer targetMajorCredits,
 
-        @Schema(description = "교양 목표 학점", example = "10")
+        @Schema(description = "교양선택 목표 학점 (교양필수·채플·사회봉사 제외)", example = "6")
         @NotNull(message = "교양 목표 학점은 필수입니다.")
         @Min(value = 0, message = "교양 목표 학점은 0 이상이어야 합니다.")
         Integer targetGeneralCredits,
