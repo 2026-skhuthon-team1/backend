@@ -88,7 +88,7 @@ public class TimetableEngineService {
 
     @Transactional(readOnly = true)
     public List<TimetableCombinationResponseDto> generateCombinations(TimetableCombinationRequestDto request) {
-        return generateTimetableCombinations(request, Collections.emptySet());
+        return generateTimetableCombinations(request, Collections.emptySet(), false);
     }
 
     public int getCurrentSemester() {
@@ -107,7 +107,7 @@ public class TimetableEngineService {
 
         TimetableCombinationRequestDto combinationRequest = toFirstYearCombinationRequest(request, Collections.emptyList());
 
-        return generateTimetableCombinations(combinationRequest, Collections.emptySet());
+        return generateTimetableCombinations(combinationRequest, Collections.emptySet(), request.includeChapel());
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +120,7 @@ public class TimetableEngineService {
                 toFirstYearCombinationRequest(request, parsedTranscript.courseCodes().stream().toList());
 
         List<TimetableCombination> reducedCombinations =
-                generateReducedCombinations(combinationRequest, parsedTranscript.courseNames());
+                generateReducedCombinations(combinationRequest, parsedTranscript.courseNames(), request.includeChapel());
         List<AiRankingResponseDto> rankings = rankOrFallback(reducedCombinations);
 
         return timetableCombinationMapper.toRecommendationResponses(
@@ -131,13 +131,17 @@ public class TimetableEngineService {
 
     private List<TimetableCombinationResponseDto> generateTimetableCombinations(
             TimetableCombinationRequestDto request,
-            Set<String> completedCourseNames
+            Set<String> completedCourseNames,
+            Boolean includeChapel
     ) {
         List<TimetableCombination> reducedCombinations =
-                generateReducedCombinations(request, completedCourseNames);
+                generateReducedCombinations(request, completedCourseNames, includeChapel);
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(request);
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request, completedCourseNames);
+        CandidateContext chapelContext =
+                resolveChapelContext(includeChapel, request.completedCourseCodes(), completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(candidateContext, fixedContext);
+        timesByOfferingId.putAll(chapelContext.timesByOfferingId());
 
         return timetableCombinationMapper.toTimetableResponses(
                 reducedCombinations,
@@ -148,22 +152,27 @@ public class TimetableEngineService {
 
     private List<TimetableCombination> generateReducedCombinations(
             TimetableCombinationRequestDto request,
-            Set<String> completedCourseNames
+            Set<String> completedCourseNames,
+            Boolean includeChapel
     ) {
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(request);
         CandidateContext candidateContext = courseCandidateProvider.findCandidates(request, completedCourseNames);
+        CandidateContext chapelContext =
+                resolveChapelContext(includeChapel, request.completedCourseCodes(), completedCourseNames);
         Map<Long, List<OfferingTime>> timesByOfferingId = mergeTimesByOfferingId(candidateContext, fixedContext);
+        timesByOfferingId.putAll(chapelContext.timesByOfferingId());
 
         List<CourseOffering> filteredOfferings = timetableConstraintFilter.apply(
-                candidateContext.offerings(),
+                excludeOptionalFixedOfferings(candidateContext.offerings()),
                 timesByOfferingId,
                 request
         );
-        List<TimetableCombination> combinations = timetableCombinationGenerator.generate(
+        List<TimetableCombination> combinations = generateWithOptionalFixedOfferings(
                 filteredOfferings,
                 timesByOfferingId,
                 request,
-                fixedContext.offerings()
+                fixedContext.offerings(),
+                List.of(selectEligibleChapelOfferings(chapelContext, timesByOfferingId, request))
         );
         List<TimetableCombination> reducedCombinations =
                 timetableCandidateReducer.reduce(combinations);
