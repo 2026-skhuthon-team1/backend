@@ -25,7 +25,7 @@ public record FirstYearTimetableRequestDto(
         @Min(value = 0, message = "전공 목표 학점은 0 이상이어야 합니다.")
         Integer targetMajorCredits,
 
-        @Schema(description = "교양 목표 학점", example = "10")
+        @Schema(description = "교양선택 목표 학점 (교양필수·채플·사회봉사 제외)", example = "6")
         @NotNull(message = "교양 목표 학점은 필수입니다.")
         @Min(value = 0, message = "교양 목표 학점은 0 이상이어야 합니다.")
         Integer targetGeneralCredits,
@@ -39,6 +39,9 @@ public record FirstYearTimetableRequestDto(
         @Schema(description = "1교시(09:00 시작) 강의 제외 여부", example = "false")
         @NotNull(message = "1교시 제외 여부는 필수입니다.")
         Boolean excludeFirstPeriod,
+
+        @Schema(description = "채플(비아메디아채플) 포함 여부. 포함하면 이수하지 않은 채플 분반 하나를 넣고, 값이 없으면 포함하지 않습니다.", example = "true")
+        Boolean includeChapel,
 
         @ArraySchema(
                 arraySchema = @Schema(description = "선택한 교양필수 강좌 목록"),
