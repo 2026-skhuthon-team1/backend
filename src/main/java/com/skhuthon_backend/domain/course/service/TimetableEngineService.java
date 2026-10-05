@@ -248,8 +248,12 @@ public class TimetableEngineService {
 
         List<CourseOffering> eligibleChapelOfferings =
                 selectEligibleChapelOfferings(chapelContext, timesByOfferingId, combinationRequest);
-        if (Boolean.TRUE.equals(request.getIncludeChapel()) && eligibleChapelOfferings.isEmpty()) {
-            log.warn("채플 포함이 요청되었지만 이수하지 않았고 제약조건을 만족하는 채플 분반이 없어 제외됨");
+        if (Boolean.TRUE.equals(request.getIncludeChapel())) {
+            if (chapelContext.offerings().isEmpty()) {
+                log.warn("채플 포함이 요청되었지만 남은 채플 분반이 없어 제외됨 (모두 이수했거나 개설 없음)");
+            } else if (eligibleChapelOfferings.isEmpty()) {
+                log.warn("채플 포함이 요청되었지만 남은 채플 분반이 모두 1교시라 제외됨: 분반 수={}", chapelContext.offerings().size());
+            }
         }
 
         List<TimetableCombination> combinations =
