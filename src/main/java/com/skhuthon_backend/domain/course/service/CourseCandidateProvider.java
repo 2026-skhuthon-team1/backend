@@ -108,6 +108,7 @@ public class CourseCandidateProvider {
     );
 
     private static final String SOCIAL_SERVICE_KEYWORD = "사회봉사";
+    private static final String CHAPEL_KEYWORD = "채플";
 
     private final CourseOfferingRepository courseOfferingRepository;
     private final OfferingTimeRepository offeringTimeRepository;
@@ -196,6 +197,26 @@ public class CourseCandidateProvider {
                         .collect(Collectors.toList());
 
         return new CandidateContext(socialServiceOfferings, findTimesByOfferingId(socialServiceOfferings));
+    }
+
+    // 채플(비아메디아채플)은 학기 데이터에 따라 교양필수 또는 교양으로 들어와 일반 후보로는 다룰 수 없다.
+    // 포함 요청 시 여기서 따로 찾고, 이미 이수한 채플(그리스도교와세계/그리스도교와인간)은 뺀다.
+    public CandidateContext findChapelOfferings(
+            List<String> completedCourseCodes,
+            Set<String> completedCourseNames
+    ) {
+        Set<String> completedCodeSet = toSet(completedCourseCodes);
+        List<CourseOffering> chapelOfferings = courseOfferingRepository.findAll().stream()
+                .filter(this::isChapel)
+                .filter(courseOffering -> !completedCodeSet.contains(courseOffering.getCourse().getCourseCode()))
+                .filter(courseOffering -> !completedCourseNames.contains(courseOffering.getCourse().getCourseName()))
+                .collect(Collectors.toList());
+
+        return new CandidateContext(chapelOfferings, findTimesByOfferingId(chapelOfferings));
+    }
+
+    public boolean isChapel(CourseOffering courseOffering) {
+        return courseOffering.getCourse().getCourseName().contains(CHAPEL_KEYWORD);
     }
 
     public CandidateContext findGeneralRequiredOfferings() {
