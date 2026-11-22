@@ -6,6 +6,7 @@ import com.skhuthon_backend.domain.course.dto.TimetableCombinationRequestDto;
 import com.skhuthon_backend.domain.course.entity.CourseCategory;
 import com.skhuthon_backend.domain.course.entity.CourseOffering;
 import com.skhuthon_backend.domain.course.entity.OfferingTime;
+import com.skhuthon_backend.domain.course.exception.MustIncludeCourseException;
 import com.skhuthon_backend.domain.course.repository.CourseOfferingRepository;
 import com.skhuthon_backend.domain.course.repository.OfferingTimeRepository;
 import lombok.RequiredArgsConstructor;
@@ -162,6 +163,28 @@ public class CourseCandidateProvider {
                 ));
 
         return new CandidateContext(selectedOfferings, selectedTimesByOfferingId);
+    }
+
+    // 꼭 넣을 과목은 학생이 직접 고른 분반이라, 전공·학년·이수 여부와 관계없이 고른 그대로 찾는다.
+    // 없는 강좌 ID가 섞여 있으면 담은 과목이 말없이 빠지지 않도록 이유를 알려 준다.
+    public CandidateContext findMustIncludeOfferings(List<Long> offeringIds) {
+        if (offeringIds == null || offeringIds.isEmpty()) {
+            return new CandidateContext(Collections.emptyList(), Collections.emptyMap());
+        }
+
+        Set<Long> requestedIds = new LinkedHashSet<>(offeringIds);
+        List<CourseOffering> offerings = courseOfferingRepository.findAllById(requestedIds);
+        Set<Long> foundIds = offerings.stream()
+                .map(CourseOffering::getId)
+                .collect(Collectors.toSet());
+        List<Long> missingIds = requestedIds.stream()
+                .filter(id -> !foundIds.contains(id))
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw new MustIncludeCourseException("담은 과목 중 개설되지 않은 강좌가 있습니다: " + missingIds);
+        }
+
+        return new CandidateContext(offerings, findTimesByOfferingId(offerings));
     }
 
     public CandidateContext findAllOfferings() {

@@ -284,14 +284,14 @@ public class TimetableCombinationGenerator {
         return remainingCredits;
     }
 
-    private int calculateMajorCredits(List<CourseOffering> offerings) {
+    int calculateMajorCredits(List<CourseOffering> offerings) {
         return offerings.stream()
                 .filter(offering -> isMajorCategory(offering.getCategory()))
                 .mapToInt(this::getCredits)
                 .sum();
     }
 
-    private int calculateGeneralCredits(List<CourseOffering> offerings) {
+    int calculateGeneralCredits(List<CourseOffering> offerings) {
         return offerings.stream()
                 .filter(this::countsTowardGeneralCredits)
                 .mapToInt(this::getCredits)

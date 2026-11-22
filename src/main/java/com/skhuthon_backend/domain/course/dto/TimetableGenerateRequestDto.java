@@ -69,4 +69,10 @@ public class TimetableGenerateRequestDto {
             schema = @Schema(description = "교양필수 과목별 교수/시간 선택")
     )
     private List<@Valid GeneralRequiredCourseSelectionDto> fixedCourses;
+
+    @ArraySchema(
+            arraySchema = @Schema(description = "꼭 넣을 강좌 ID 목록. 담은 과목은 모든 시간표에 들어가며, 같은 과목의 분반을 여러 개 담으면 그중 하나가 들어갑니다."),
+            schema = @Schema(description = "강좌(분반) ID", example = "12")
+    )
+    private List<@NotNull(message = "꼭 넣을 강좌 ID는 비어 있을 수 없습니다.") Long> mustIncludeOfferingIds;
 }

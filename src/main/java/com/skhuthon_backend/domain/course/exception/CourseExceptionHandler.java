@@ -14,4 +14,9 @@ public class CourseExceptionHandler {
     public ResponseEntity<Map<String, String>> handleSemesterNotOpen(SemesterNotOpenException exception) {
         return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
     }
+
+    @ExceptionHandler(MustIncludeCourseException.class)
+    public ResponseEntity<Map<String, String>> handleMustIncludeCourse(MustIncludeCourseException exception) {
+        return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+    }
 }
