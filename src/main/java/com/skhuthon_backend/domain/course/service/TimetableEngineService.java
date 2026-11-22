@@ -205,7 +205,8 @@ public class TimetableEngineService {
                         request.getFreeDays(),
                         request.getExcludeFirstPeriod(),
                         completedCourseCodes.stream().toList(),
-                        request.getFixedCourses()
+                        request.getFixedCourses(),
+                        request.getMustIncludeOfferingIds()
                 );
 
         CandidateContext fixedContext = resolveFixedGeneralRequiredContext(combinationRequest);
@@ -313,7 +314,8 @@ public class TimetableEngineService {
                 request.freeDays(),
                 request.excludeFirstPeriod(),
                 completedCourseCodes,
-                request.fixedCourses()
+                request.fixedCourses(),
+                request.mustIncludeOfferingIds()
         );
     }
 

@@ -90,6 +90,7 @@ class TimetableCombinationGeneratorTest {
                 Collections.emptyList(),
                 false,
                 Collections.emptyList(),
+                Collections.emptyList(),
                 Collections.emptyList()
         );
     }
